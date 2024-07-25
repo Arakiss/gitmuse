@@ -11,6 +11,19 @@ import os
 console = Console()
 
 
+def display_table(
+    title: str, columns: List[Tuple[str, str]], rows: List[Tuple[str, str]]
+) -> None:
+    table = Table(title=title, title_justify="full")
+    for col_name, col_style in columns:
+        table.add_column(col_name, style=col_style)
+
+    for row in rows:
+        table.add_row(*row)
+
+    console.print(table)
+
+
 def display_changes(
     staged_files: List[Tuple[str, str]], ignored_files: List[str]
 ) -> None:
@@ -18,16 +31,15 @@ def display_changes(
     for status, file_path in staged_files:
         changes[status].append(file_path)
 
-    table = Table(title="Changes to be committed", title_justify="full")
-    table.add_column("Status", style="cyan")
-    table.add_column("File", style="green")
-
+    rows = []
     for status, files in changes.items():
         status_word = {"A": "New file", "M": "Modified", "D": "Deleted"}[status]
         for file in files:
-            table.add_row(status_word, file)
+            rows.append((status_word, file))
 
-    console.print(table)
+    display_table(
+        "Changes to be committed", [("Status", "cyan"), ("File", "green")], rows
+    )
 
     if ignored_files:
         console.print(
@@ -102,18 +114,13 @@ def perform_commit(message: str) -> None:
 
 
 def display_ai_model_info(provider: str) -> None:
-    if provider == "ollama":
-        console.print(
-            "[bold green]Using Llama 3.1 model via Ollama for commit message generation.[/bold green]"
-        )
-    elif provider == "openai":
-        console.print(
-            "[bold green]Using OpenAI's GPT model for commit message generation.[/bold green]"
-        )
-    else:
-        console.print(
-            f"[bold yellow]Using {provider} for commit message generation.[/bold yellow]"
-        )
+    model_info = {
+        "ollama": "Using Llama 3.1 model via Ollama for commit message generation.",
+        "openai": "Using OpenAI's GPT model for commit message generation.",
+    }
+    console.print(
+        f"[bold green]{model_info.get(provider, f'Using {provider} for commit message generation.')}[/bold green]"
+    )
 
 
 if __name__ == "__main__":
