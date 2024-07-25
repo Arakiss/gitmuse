@@ -1,7 +1,7 @@
 import os
 import click
 from rich.console import Console
-from gitmuse.config.settings import get_ai_provider, get_openai_api_key, init_config
+from gitmuse.config.settings import CONFIG
 from gitmuse.cli.commands import commit_command
 from gitmuse.providers.openai import OpenAIProvider
 from gitmuse.providers.ollama import OllamaProvider
@@ -28,9 +28,9 @@ def commit():
 def init(is_global):
     """Initialize GitMuse configuration"""
     if is_global:
-        init_config(os.path.expanduser("~/gitmuse.json"))
+        CONFIG.init_config(os.path.expanduser("~/gitmuse.json"))
     else:
-        init_config()
+        CONFIG.init_config()
 
 
 def run_commit() -> None:
@@ -40,10 +40,10 @@ def run_commit() -> None:
     Raises errors if the provider is unsupported, API key is missing for OpenAI, or Ollama is not accessible.
     """
     try:
-        provider = os.getenv("PROVIDER", get_ai_provider())
+        provider = os.getenv("PROVIDER", CONFIG.get_ai_provider())
 
         if provider == "openai":
-            openai_api_key = os.getenv("OPENAI_API_KEY") or get_openai_api_key()
+            openai_api_key = os.getenv("OPENAI_API_KEY") or CONFIG.get_openai_api_key()
             if not openai_api_key:
                 raise RuntimeError(
                     "OpenAI API key not found. Please set the OPENAI_API_KEY environment variable or in the configuration file."

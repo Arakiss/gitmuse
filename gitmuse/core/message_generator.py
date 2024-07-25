@@ -1,11 +1,7 @@
 import os
 from typing import Dict, List, Tuple
 from gitmuse.core.diff_analyzer import analyze_diff
-from gitmuse.config.settings import (
-    get_ai_provider,
-    get_conventional_commit_types,
-    get_commit_message_template,
-)
+from gitmuse.config.settings import CONFIG
 from gitmuse.providers.openai import OpenAIProvider
 from gitmuse.providers.ollama import OllamaProvider
 from rich.console import Console
@@ -15,7 +11,7 @@ console = Console()
 
 def get_provider(provider: str = None):
     providers = {"openai": OpenAIProvider, "ollama": OllamaProvider}
-    provider = provider or get_ai_provider()
+    provider = provider or CONFIG.get_ai_provider()
     provider_class = providers.get(provider)
     if provider_class is None:
         raise ValueError(f"Unsupported provider specified: {provider}")
@@ -75,9 +71,9 @@ def generate_detailed_changes(changes: Dict[str, List[Dict[str, str]]]) -> List[
 def create_prompt_content(
     files_summary: str, changes_summary: str, detailed_changes: List[str]
 ) -> str:
-    commit_types = get_conventional_commit_types()
+    commit_types = CONFIG.get_conventional_commit_types()
     keywords = ", ".join([f"{emoji} {verb}" for verb, emoji in commit_types.items()])
-    template = get_commit_message_template()
+    template = CONFIG.get_commit_message_template()
 
     if not template:
         template = """
