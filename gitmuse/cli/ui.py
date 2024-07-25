@@ -56,7 +56,7 @@ def display_diff(diff: str) -> None:
     view_option = Prompt.ask(
         "How would you like to view the diff?",
         choices=["full", "summary", "none"],
-        default="summary",
+        default="none",
     )
     if view_option == "none":
         console.print("[bold blue]Diff view skipped.[/bold blue]")
