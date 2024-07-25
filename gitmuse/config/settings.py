@@ -16,3 +16,5 @@ COMMIT_KEYWORDS = {
     "Revise": "📝",
     "Refresh": "🔄",
 }
+
+DEFAULT_PROVIDER = "ollama"  # 'ollama', 'openai'

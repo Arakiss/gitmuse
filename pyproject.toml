@@ -30,6 +30,8 @@ python = ">=3.11,<4.0"
 rich = "^13.1.0"
 ruff = "^0.5.4"
 ollama = "^0.3.0"
+openai = "^1.37.0"
+toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.11.0"

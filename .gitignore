@@ -37,6 +37,9 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
+# Random stuff
+report.py
+
 # Unit test / coverage reports
 htmlcov/
 .tox/
@@ -169,3 +172,4 @@ poetry.toml
 
 # LSP config files
 pyrightconfig.json
+
