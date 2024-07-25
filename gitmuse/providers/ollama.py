@@ -50,9 +50,7 @@ class OllamaProvider(AIProvider):
 
     @staticmethod
     def format_prompt_for_llama(prompt: str) -> str:
-        return f"""system
-
-You are an AI assistant specialized in generating git commit messages. Your task is to create concise, informative, and well-structured commit messages based on the provided information.
+        system_message = """You are an AI assistant specialized in generating git commit messages. Your task is to create concise, informative, and well-structured commit messages based on the provided information.
 
 Guidelines for generating commit messages:
 1. Start with an emoji that represents the type of change, followed by an imperative present tense verb.
@@ -70,13 +68,11 @@ Format the message exactly like this:
 - Key change 2
 - Key change 3 (if necessary)
 
-Respond ONLY with the commit message, no additional text or explanations.
+Respond ONLY with the commit message, no additional text or explanations."""
 
-user
-
-{prompt}
-
-assistant
+        return f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+{system_message}<|eot_id|><|start_header_id|>user<|end_header_id|>
+{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 """
 
     def process_ollama_response(self, response: Dict[str, Any]) -> str:
@@ -113,7 +109,7 @@ if __name__ == "__main__":
     +from gitmuse.config.settings import ADDITIONAL_IGNORE_PATTERNS
 
     def analyze_diff(diff):
-        lines = diff.split('\\n')
+        lines = diff.split('\n')
     """
     provider = OllamaProvider()
     print(provider.generate_commit_message(sample_diff))
