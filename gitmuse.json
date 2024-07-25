@@ -4,12 +4,12 @@
 	"ai": {
 		"provider": "ollama",
 		"openai": {
-			"model": "gpt-3.5-turbo",
+			"model": "gpt4o",
 			"apiKey": "",
 			"organizationId": ""
 		},
 		"ollama": {
-			"model": "llama2:13b",
+			"model": "llama3.1",
 			"url": "http://localhost:11434"
 		}
 	},

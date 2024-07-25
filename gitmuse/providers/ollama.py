@@ -2,9 +2,10 @@ from functools import lru_cache
 from typing import Optional, Dict, Any
 from gitmuse.providers.base import AIProvider
 import ollama
-from rich.console import Console
+from gitmuse.utils.logging import get_logger
+from gitmuse.config.settings import CONFIG
 
-console = Console()
+logger = get_logger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -12,19 +13,23 @@ def get_ollama_status() -> Optional[Dict[str, Any]]:
     try:
         return ollama.ps()
     except Exception as e:
-        console.print(f"[bold red]Error checking Ollama status: {e}[/bold red]")
+        logger.error(f"Error checking Ollama status: {e}")
         return None
 
 
 class OllamaProvider(AIProvider):
-    def __init__(self, model_name: str = "llama3.1"):
-        super().__init__(model_name)
+    def __init__(self, model_name: Optional[str] = None):
+        super().__init__(model_name or CONFIG.get_ai_model())
         self.status = get_ollama_status()
+        self.url = CONFIG.get_ollama_url()
+        logger.info(f"Initialized OllamaProvider with model {self.model}")
 
     def generate_commit_message(self, prompt: str) -> str:
         if not self.status:
+            logger.warning("Ollama is not running or not accessible.")
             return "📝 Update files\n\nOllama is not running or not accessible."
 
+        logger.info("Generating commit message with Ollama")
         with self.display_progress("Generating commit message...") as progress:
             task = progress.add_task("[cyan]Generating commit message...", total=None)
             try:
@@ -32,21 +37,23 @@ class OllamaProvider(AIProvider):
                 response = ollama.generate(
                     model=self.model,
                     prompt=formatted_prompt,
-                    options={
-                        "temperature": 0.6,
-                        "top_p": 0.9,
-                        "top_k": 40,
-                        "num_predict": 256,
-                    },
+                    options=self.get_generation_options(),
                 )
                 progress.update(task, completed=True)
                 return self.process_ollama_response(response)
             except Exception as e:
                 progress.update(task, completed=True)
-                console.print(
-                    f"[bold red]Error generating commit message with Ollama: {e}[/bold red]"
-                )
+                logger.error(f"Error generating commit message with Ollama: {e}")
                 return "📝 Update files\n\nSummary of changes."
+
+    @staticmethod
+    def get_generation_options() -> Dict[str, Any]:
+        return {
+            "temperature": 0.6,
+            "top_p": 0.9,
+            "top_k": 40,
+            "num_predict": 256,
+        }
 
     @staticmethod
     def format_prompt_for_llama(prompt: str) -> str:
@@ -78,6 +85,7 @@ Respond ONLY with the commit message, no additional text or explanations."""
     def process_ollama_response(self, response: Dict[str, Any]) -> str:
         generated_message = response.get("response", "").strip()
         if not generated_message:
+            logger.warning("Ollama returned an empty response")
             return "📝 Update files\n\nSummary of changes."
 
         lines = generated_message.split("\n")
@@ -88,13 +96,17 @@ Respond ONLY with the commit message, no additional text or explanations."""
         ]
         return "\n".join(cleaned_lines).strip()
 
-    @staticmethod
-    def check_ollama() -> bool:
+    @classmethod
+    def check_ollama(cls) -> bool:
         status = get_ollama_status()
+        if status is None:
+            logger.warning("Ollama is not available")
+        else:
+            logger.info("Ollama is available")
         return status is not None
 
     def __repr__(self) -> str:
-        return f"OllamaProvider(model_name='{self.model}', status={'Available' if self.status else 'Unavailable'})"
+        return f"OllamaProvider(model_name='{self.model}', status={'Available' if self.status else 'Unavailable'}, url='{self.url}')"
 
 
 if __name__ == "__main__":
@@ -112,4 +124,5 @@ if __name__ == "__main__":
         lines = diff.split('\n')
     """
     provider = OllamaProvider()
-    print(provider.generate_commit_message(sample_diff))
+    commit_message = provider.generate_commit_message(sample_diff)
+    logger.info(f"Generated commit message:\n{commit_message}")

@@ -8,7 +8,9 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 import tempfile
 import subprocess
 import os
+from gitmuse.utils.logging import get_logger
 
+logger = get_logger(__name__)
 console = Console()
 
 
@@ -23,6 +25,7 @@ def display_table(
         table.add_row(*row)
 
     console.print(table)
+    logger.debug(f"Displayed table: {title}")
 
 
 def display_changes(
@@ -43,13 +46,15 @@ def display_changes(
     )
 
     if ignored_files:
+        ignored_count = len(ignored_files)
         console.print(
-            f"\n[bold yellow]Ignored {len(ignored_files)} file(s) based on .gitignore rules:[/bold yellow]"
+            f"\n[bold yellow]Ignored {ignored_count} file(s) based on .gitignore rules:[/bold yellow]"
         )
         for file in ignored_files[:5]:
             console.print(f"  - {file}")
-        if len(ignored_files) > 5:
-            console.print(f"  ... and {len(ignored_files) - 5} more")
+        if ignored_count > 5:
+            console.print(f"  ... and {ignored_count - 5} more")
+        logger.info(f"Ignored {ignored_count} files based on .gitignore rules")
 
 
 def display_diff(diff: str) -> None:
@@ -60,6 +65,7 @@ def display_diff(diff: str) -> None:
     )
     if view_option == "none":
         console.print("[bold blue]Diff view skipped.[/bold blue]")
+        logger.info("Diff view skipped by user")
         return
 
     max_lines = (
@@ -83,6 +89,7 @@ def display_diff(diff: str) -> None:
             expand=False,
         )
     )
+    logger.info(f"Displayed diff view: {view_option}")
 
 
 def edit_commit_message(initial_message: str) -> str:
@@ -94,8 +101,10 @@ def edit_commit_message(initial_message: str) -> str:
             subprocess.run([editor, temp_file.name], check=True)
             temp_file.seek(0)
             edited_message = temp_file.read()
+        logger.info("Commit message edited by user")
         return edited_message.strip()
     except subprocess.CalledProcessError:
+        logger.error("Failed to open editor for commit message editing")
         console.print(
             "[bold red]Error: Failed to open editor. Using original message.[/bold red]"
         )
@@ -106,9 +115,11 @@ def edit_commit_message(initial_message: str) -> str:
 
 def perform_commit(message: str) -> None:
     if not Confirm.ask(
-        "[bold yellow]Are you sure you want to commit with this message?[/bold yellow]"
+        "[bold yellow]Are you sure you want to commit with this message?[/bold yellow]",
+        default=True,  # Cambiado a True para que 'y' sea el valor por defecto
     ):
         console.print("[bold blue]Commit cancelled.[/bold blue]")
+        logger.info("Commit cancelled by user")
         return
 
     with Progress(
@@ -129,9 +140,12 @@ def perform_commit(message: str) -> None:
             console.print(
                 f"[bold green]Commit successfully created.[/bold green]\n{result.stdout}"
             )
+            logger.info("Commit successfully created")
         except subprocess.CalledProcessError as e:
             progress.update(task, completed=True)
-            console.print(f"[bold red]Error: Git commit failed.[/bold red]\n{e.stderr}")
+            error_message = f"Git commit failed: {e.stderr}"
+            console.print(f"[bold red]Error: {error_message}[/bold red]")
+            logger.error(error_message)
 
 
 def display_ai_model_info(provider: str) -> None:
@@ -139,9 +153,11 @@ def display_ai_model_info(provider: str) -> None:
         "ollama": "Using Llama 3.1 model via Ollama for commit message generation.",
         "openai": "Using OpenAI's GPT model for commit message generation.",
     }
-    console.print(
-        f"[bold green]{model_info.get(provider, f'Using {provider} for commit message generation.')}[/bold green]"
+    info_message = model_info.get(
+        provider, f"Using {provider} for commit message generation."
     )
+    console.print(f"[bold green]{info_message}[/bold green]")
+    logger.info(f"AI model info: {info_message}")
 
 
 if __name__ == "__main__":
