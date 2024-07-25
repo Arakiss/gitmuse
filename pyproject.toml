@@ -1,15 +1,39 @@
-[tool.poetry]
-name = "gitmuse"
-version = "0.1.0"
-description = ""
-authors = ["Petru Arakiss <petruarakiss@gmail.com>"]
-readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.11"
-rich = "^13.7.1"
-
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "gitmuse"
+version = "0.1.0"
+description = "GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages."
+authors = ["Petru Arakiss <petruarakiss@gmail.com>"]
+readme = "README.md"
+homepage = "https://github.com/Arakiss/gitmuse"
+repository = "https://github.com/Arakiss/gitmuse"
+documentation = "https://github.com/Arakiss/gitmuse/wiki"
+license = "MIT"
+keywords = ["git", "gpt", "openai", "cli", "productivity", "commit-messages"]
+classifiers = [
+    "Operating System :: OS Independent",
+    "Topic :: Software Development",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+rich = "^13.1.0"
+ruff = "^0.5.4"
+ollama = "^0.3.0"
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.11.0"
+pytest = "^8.3.1"
+
+[tool.poetry.scripts]
+gitmuse = "gitmuse.__main__:main"
