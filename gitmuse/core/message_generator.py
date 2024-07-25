@@ -81,29 +81,30 @@ def create_prompt_content(
 
     if not template:
         template = """
-        Generate a git commit message for the following changes:
+        Generate a concise and meaningful git commit message for the following changes:
         Files changed: {files_summary}
         Summary: {changes_summary}
 
         Detailed changes:
         {detailed_changes}
 
-        Follow these guidelines:
+        Follow these guidelines strictly:
         1. Start with an emoji and an imperative present active verb from this list: {keywords}
         2. The first line should be a summary, maximum 50 characters (including the emoji)
         3. Leave a blank line after the summary
-        4. Provide a more detailed description of the changes, focusing on the most significant modifications
-        5. Use bullet points for multiple changes
-        6. Be specific about what changed and why, mentioning key files or components that were affected
-        7. Don't include the full file names in the message body
+        4. Provide 2-3 bullet points explaining key changes, each starting with a dash (-)
+        5. Focus on the 'what' and 'why' of the changes, not the 'how'
+        6. Do not include file names or technical details unless absolutely necessary
+        7. Do not add any notes, explanations, or comments about the commit message itself
 
-        Format the message like this:
+        Format the message exactly like this:
         🎨 Verb Summary of changes
 
-        - Detailed explanation of changes
-        - Another point if necessary
+        - Key change 1
+        - Key change 2
+        - Key change 3 (if necessary)
 
-        IMPORTANT: Provide ONLY the commit message, no additional explanations.
+        IMPORTANT: Provide ONLY the commit message, no additional text or explanations.
         """
 
     return template.format(

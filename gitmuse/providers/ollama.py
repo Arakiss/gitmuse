@@ -39,7 +39,7 @@ class OllamaProvider(BaseProvider):
                     model=self.model_name,
                     prompt=formatted_prompt,
                     options={
-                        "temperature": 0.7,
+                        "temperature": 0.6,
                         "top_p": 0.9,
                         "top_k": 40,
                         "num_predict": 256,
@@ -57,32 +57,42 @@ class OllamaProvider(BaseProvider):
                 return "📝 Update files\n\nSummary of changes."
 
     def process_ollama_response(self, response: Dict[str, Any]) -> str:
-        console.print("[bold green]Ollama response metadata:[/bold green]")
-        console.print(f"  Model: {response.get('model', 'Unknown')}")
-        console.print(f"  Created at: {response.get('created_at', 'Unknown')}")
-        console.print(
-            f"  Total duration: {response.get('total_duration', 'Unknown')} ns"
-        )
-
         generated_message = response.get("response", "").strip()
         if not generated_message:
             return "📝 Update files\n\nSummary of changes."
-        return generated_message.split("<|eot_id|>")[0].strip()
+
+        # Remove any extra explanations or notes
+        lines = generated_message.split("\n")
+        cleaned_lines = [
+            line
+            for line in lines
+            if not line.startswith("Note:") and not line.startswith("IMPORTANT:")
+        ]
+        return "\n".join(cleaned_lines).strip()
 
     @staticmethod
     def format_prompt_for_llama(prompt: str) -> str:
         return f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-You are a helpful AI assistant for generating git commit messages. Your task is to create concise, informative, and well-structured commit messages based on the provided diff information.
+You are an AI assistant specialized in generating git commit messages. Your task is to create concise, informative, and well-structured commit messages based on the provided information.
 
 Guidelines for generating commit messages:
-1. Start with an emoji that represents the type of change.
-2. Use an imperative present tense verb to describe the main action.
-3. Keep the first line (summary) under 50 characters.
-4. Provide more details in subsequent lines, if necessary.
-5. Use bullet points for multiple changes.
-6. Focus on the 'why' behind the changes, not just the 'what'.
-7. Mention any breaking changes prominently.
+1. Start with an emoji that represents the type of change, followed by an imperative present tense verb.
+2. Keep the first line (summary) under 50 characters, including the emoji.
+3. Leave a blank line after the summary.
+4. Provide 2-3 bullet points explaining key changes, each starting with a dash (-).
+5. Focus on the 'what' and 'why' of the changes, not the 'how'.
+6. Do not include file names or technical details unless absolutely necessary.
+7. Do not add any notes, explanations, or comments about the commit message itself.
+
+Format the message exactly like this:
+🎨 Verb Summary of changes
+
+- Key change 1
+- Key change 2
+- Key change 3 (if necessary)
+
+Respond ONLY with the commit message, no additional text or explanations.
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 
