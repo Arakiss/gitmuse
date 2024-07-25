@@ -9,6 +9,11 @@ console = Console()
 
 
 def run_cli() -> None:
+    """
+    Run the command-line interface (CLI) to handle commits based on the specified provider.
+    Checks the provider environment variable and configures the corresponding provider (OpenAI or Ollama).
+    Raises errors if the provider is unsupported, API key is missing for OpenAI, or Ollama is not accessible.
+    """
     try:
         provider = os.getenv("PROVIDER", DEFAULT_PROVIDER)
 
