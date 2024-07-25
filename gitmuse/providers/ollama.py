@@ -1,8 +1,7 @@
 from functools import lru_cache
 from typing import Optional, Dict, Any
-from gitmuse.providers.base import BaseProvider
+from gitmuse.providers.base import AIProvider
 import ollama
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.console import Console
 
 console = Console()
@@ -17,26 +16,21 @@ def get_ollama_status() -> Optional[Dict[str, Any]]:
         return None
 
 
-class OllamaProvider(BaseProvider):
+class OllamaProvider(AIProvider):
     def __init__(self, model_name: str = "llama3.1"):
-        self.model_name = model_name
+        super().__init__(model_name)
         self.status = get_ollama_status()
 
     def generate_commit_message(self, prompt: str) -> str:
         if not self.status:
             return "📝 Update files\n\nOllama is not running or not accessible."
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
+        with self.display_progress("Generating commit message...") as progress:
             task = progress.add_task("[cyan]Generating commit message...", total=None)
-
             try:
                 formatted_prompt = self.format_prompt_for_llama(prompt)
                 response = ollama.generate(
-                    model=self.model_name,
+                    model=self.model,
                     prompt=formatted_prompt,
                     options={
                         "temperature": 0.6,
@@ -46,9 +40,7 @@ class OllamaProvider(BaseProvider):
                     },
                 )
                 progress.update(task, completed=True)
-
-                generated_message = self.process_ollama_response(response)
-                return generated_message
+                return self.process_ollama_response(response)
             except Exception as e:
                 progress.update(task, completed=True)
                 console.print(
@@ -56,23 +48,9 @@ class OllamaProvider(BaseProvider):
                 )
                 return "📝 Update files\n\nSummary of changes."
 
-    def process_ollama_response(self, response: Dict[str, Any]) -> str:
-        generated_message = response.get("response", "").strip()
-        if not generated_message:
-            return "📝 Update files\n\nSummary of changes."
-
-        # Remove any extra explanations or notes
-        lines = generated_message.split("\n")
-        cleaned_lines = [
-            line
-            for line in lines
-            if not line.startswith("Note:") and not line.startswith("IMPORTANT:")
-        ]
-        return "\n".join(cleaned_lines).strip()
-
     @staticmethod
     def format_prompt_for_llama(prompt: str) -> str:
-        return f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        return f"""system
 
 You are an AI assistant specialized in generating git commit messages. Your task is to create concise, informative, and well-structured commit messages based on the provided information.
 
@@ -94,12 +72,25 @@ Format the message exactly like this:
 
 Respond ONLY with the commit message, no additional text or explanations.
 
-<|eot_id|><|start_header_id|>user<|end_header_id|>
+user
 
 {prompt}
 
-<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+assistant
 """
+
+    def process_ollama_response(self, response: Dict[str, Any]) -> str:
+        generated_message = response.get("response", "").strip()
+        if not generated_message:
+            return "📝 Update files\n\nSummary of changes."
+
+        lines = generated_message.split("\n")
+        cleaned_lines = [
+            line
+            for line in lines
+            if not line.startswith("Note:") and not line.startswith("IMPORTANT:")
+        ]
+        return "\n".join(cleaned_lines).strip()
 
     @staticmethod
     def check_ollama() -> bool:
@@ -107,7 +98,7 @@ Respond ONLY with the commit message, no additional text or explanations.
         return status is not None
 
     def __repr__(self) -> str:
-        return f"OllamaProvider(model_name='{self.model_name}', status={'Available' if self.status else 'Unavailable'})"
+        return f"OllamaProvider(model_name='{self.model}', status={'Available' if self.status else 'Unavailable'})"
 
 
 if __name__ == "__main__":

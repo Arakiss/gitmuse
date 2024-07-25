@@ -1,31 +1,23 @@
-from gitmuse.providers.base import BaseProvider
+from gitmuse.providers.base import AIProvider
 import openai
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.console import Console
 
 console = Console()
 
 
-class OpenAIProvider(BaseProvider):
+class OpenAIProvider(AIProvider):
     def __init__(
         self, model: str = "gpt-4", max_tokens: int = 300, temperature: float = 0.7
     ):
-        self.model = model
-        self.max_tokens = max_tokens
-        self.temperature = temperature
+        super().__init__(model, max_tokens, temperature)
 
     @staticmethod
     def configure(api_key: str):
         openai.api_key = api_key
 
     def generate_commit_message(self, prompt: str) -> str:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
+        with self.display_progress("Generating commit message...") as progress:
             task = progress.add_task("[cyan]Generating commit message...", total=None)
-
             try:
                 response = openai.Completion.create(
                     model=self.model,
