@@ -1,4 +1,4 @@
-from typing import List, Tuple, Set, Dict
+from typing import List, Tuple, Set, Dict, Literal
 import difflib
 from gitmuse.core.git_utils import run_command, should_ignore
 
@@ -9,12 +9,16 @@ ADDITIONAL_IGNORE_PATTERNS = {
     "bun.lock",
 }
 
+FileStatus = Literal["A", "M", "D"]
+
 
 class GitDiffAnalyzer:
     def __init__(self, ignore_patterns: Set[str]):
         self.ignore_patterns = ignore_patterns.union(ADDITIONAL_IGNORE_PATTERNS)
 
-    def get_diff(self, staged_files: List[Tuple[str, str]]) -> Tuple[str, List[str]]:
+    def get_diff(
+        self, staged_files: List[Tuple[FileStatus, str]]
+    ) -> Tuple[str, List[str]]:
         filtered_diff = ""
         ignored_files = []
 
@@ -29,15 +33,18 @@ class GitDiffAnalyzer:
 
         return filtered_diff, ignored_files
 
-    def _get_file_contents(self, status: str, file_path: str) -> Tuple[str, str]:
+    def _get_file_contents(self, status: FileStatus, file_path: str) -> Tuple[str, str]:
         if status == "A":
-            return "", run_command(["git", "show", f":0:{file_path}"]).stdout
+            return "", self._run_git_command([":0", file_path])
         elif status == "D":
-            return run_command(["git", "show", f"HEAD:{file_path}"]).stdout, ""
+            return self._run_git_command(["HEAD", file_path]), ""
         else:
-            old_content = run_command(["git", "show", f"HEAD:{file_path}"]).stdout
-            new_content = run_command(["git", "show", f":0:{file_path}"]).stdout
+            old_content = self._run_git_command(["HEAD", file_path])
+            new_content = self._run_git_command([":0", file_path])
             return old_content, new_content
+
+    def _run_git_command(self, ref_file: List[str]) -> str:
+        return run_command(["git", "show", f"{ref_file[0]}:{ref_file[1]}"]).stdout
 
     def _generate_diff(
         self, file_path: str, old_content: str, new_content: str
@@ -60,11 +67,8 @@ class GitDiffAnalyzer:
         for line in diff.split("\n"):
             if line.startswith("File:"):
                 if current_file:  # Save the changes of the previous file
-                    changes[current_status].append(
-                        {
-                            "file": current_file,
-                            "content": "".join(current_content).strip(),
-                        }
+                    self._append_change(
+                        changes, current_status, current_file, current_content
                     )
                 current_file = line.split(": ", 1)[1].strip()
                 current_content = []
@@ -76,11 +80,18 @@ class GitDiffAnalyzer:
                 current_content.append(line + "\n")
 
         if current_file:  # Save the changes of the last file
-            changes[current_status].append(
-                {"file": current_file, "content": "".join(current_content).strip()}
-            )
+            self._append_change(changes, current_status, current_file, current_content)
 
         return changes
+
+    def _append_change(
+        self,
+        changes: Dict[str, List[Dict[str, str]]],
+        status: str,
+        file: str,
+        content: List[str],
+    ):
+        changes[status].append({"file": file, "content": "".join(content).strip()})
 
 
 def analyze_diff(diff: str) -> Dict[str, List[Dict[str, str]]]:
