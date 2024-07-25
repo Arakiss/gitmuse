@@ -1,0 +1,41 @@
+{
+	"$schema": "./gitmuse-schema.json",
+	"version": 1,
+	"ai": {
+		"provider": "ollama",
+		"openai": {
+			"model": "gpt-3.5-turbo",
+			"apiKey": "",
+			"organizationId": ""
+		},
+		"ollama": {
+			"model": "llama2:13b",
+			"url": "http://localhost:11434"
+		}
+	},
+	"commit": {
+		"style": "conventional",
+		"maxLength": 72,
+		"includeScope": true,
+		"includeBody": true,
+		"includeFooter": true,
+		"conventionalCommitTypes": {
+			"feat": "✨",
+			"fix": "🐛",
+			"docs": "📝",
+			"style": "💎",
+			"refactor": "♻️",
+			"perf": "⚡",
+			"test": "🧪",
+			"build": "🏗️",
+			"ci": "🚀",
+			"chore": "🧹"
+		}
+	},
+	"prompts": {
+		"commitMessage": {
+			"useDefault": true,
+			"customTemplate": ""
+		}
+	}
+}

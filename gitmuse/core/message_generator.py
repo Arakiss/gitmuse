@@ -1,7 +1,11 @@
 import os
 from typing import Dict, List, Tuple
 from gitmuse.core.diff_analyzer import analyze_diff
-from gitmuse.config.settings import COMMIT_KEYWORDS, DEFAULT_PROVIDER
+from gitmuse.config.settings import (
+    get_ai_provider,
+    get_conventional_commit_types,
+    get_commit_message_template,
+)
 from gitmuse.providers.openai import OpenAIProvider
 from gitmuse.providers.ollama import OllamaProvider
 from rich.console import Console
@@ -9,15 +13,16 @@ from rich.console import Console
 console = Console()
 
 
-def get_provider(provider: str = DEFAULT_PROVIDER):
+def get_provider(provider: str = None):
     providers = {"openai": OpenAIProvider, "ollama": OllamaProvider}
+    provider = provider or get_ai_provider()
     provider_class = providers.get(provider)
     if provider_class is None:
         raise ValueError(f"Unsupported provider specified: {provider}")
     return provider_class()
 
 
-def generate_commit_message(diff: str, provider: str = DEFAULT_PROVIDER) -> str:
+def generate_commit_message(diff: str, provider: str = None) -> str:
     try:
         changes = analyze_diff(diff)
         files_summary, changes_summary = summarize_changes(changes)
@@ -70,32 +75,43 @@ def generate_detailed_changes(changes: Dict[str, List[Dict[str, str]]]) -> List[
 def create_prompt_content(
     files_summary: str, changes_summary: str, detailed_changes: List[str]
 ) -> str:
-    keywords = ", ".join([f"{emoji} {verb}" for verb, emoji in COMMIT_KEYWORDS.items()])
-    return f"""
-    Generate a git commit message for the following changes:
-    Files changed: {files_summary}
-    Summary: {changes_summary}
+    commit_types = get_conventional_commit_types()
+    keywords = ", ".join([f"{emoji} {verb}" for verb, emoji in commit_types.items()])
+    template = get_commit_message_template()
 
-    Detailed changes:
-    {' '.join(detailed_changes)}
+    if not template:
+        template = """
+        Generate a git commit message for the following changes:
+        Files changed: {files_summary}
+        Summary: {changes_summary}
 
-    Follow these guidelines:
-    1. Start with an emoji and an imperative present active verb from this list: {keywords}
-    2. The first line should be a summary, maximum 50 characters (including the emoji)
-    3. Leave a blank line after the summary
-    4. Provide a more detailed description of the changes, focusing on the most significant modifications
-    5. Use bullet points for multiple changes
-    6. Be specific about what changed and why, mentioning key files or components that were affected
-    7. Don't include the full file names in the message body
+        Detailed changes:
+        {detailed_changes}
 
-    Format the message like this:
-    🎨 Verb Summary of changes
+        Follow these guidelines:
+        1. Start with an emoji and an imperative present active verb from this list: {keywords}
+        2. The first line should be a summary, maximum 50 characters (including the emoji)
+        3. Leave a blank line after the summary
+        4. Provide a more detailed description of the changes, focusing on the most significant modifications
+        5. Use bullet points for multiple changes
+        6. Be specific about what changed and why, mentioning key files or components that were affected
+        7. Don't include the full file names in the message body
 
-    - Detailed explanation of changes
-    - Another point if necessary
+        Format the message like this:
+        🎨 Verb Summary of changes
 
-    IMPORTANT: Provide ONLY the commit message, no additional explanations.
-    """
+        - Detailed explanation of changes
+        - Another point if necessary
+
+        IMPORTANT: Provide ONLY the commit message, no additional explanations.
+        """
+
+    return template.format(
+        files_summary=files_summary,
+        changes_summary=changes_summary,
+        detailed_changes=" ".join(detailed_changes),
+        keywords=keywords,
+    )
 
 
 if __name__ == "__main__":
@@ -112,4 +128,4 @@ if __name__ == "__main__":
     def analyze_diff(diff):
         lines = diff.split('\\n')
     """
-    print(generate_commit_message(sample_diff, provider="ollama"))
+    print(generate_commit_message(sample_diff))

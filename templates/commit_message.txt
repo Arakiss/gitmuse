@@ -1,0 +1,11 @@
+Given the following git diff, generate a commit message:
+{diff}
+
+The commit message should follow these guidelines:
+1. Start with a concise summary (max 50 characters)
+2. Leave a blank line after the summary
+3. Provide more details in the body (if necessary)
+4. Use the imperative mood in the subject line
+5. Do not end the subject line with a period
+6. Wrap the body at 72 characters
+7. Use the body to explain what and why vs. how

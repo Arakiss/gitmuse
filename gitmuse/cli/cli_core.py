@@ -1,6 +1,7 @@
 import os
+import click
 from rich.console import Console
-from gitmuse.config.settings import DEFAULT_PROVIDER
+from gitmuse.config.settings import get_ai_provider, get_openai_api_key, init_config
 from gitmuse.cli.commands import commit_command
 from gitmuse.providers.openai import OpenAIProvider
 from gitmuse.providers.ollama import OllamaProvider
@@ -8,20 +9,44 @@ from gitmuse.providers.ollama import OllamaProvider
 console = Console()
 
 
-def run_cli() -> None:
+@click.group()
+def cli():
+    """GitMuse CLI"""
+    pass
+
+
+@cli.command()
+def commit():
+    """Generate and apply a commit message"""
+    run_commit()
+
+
+@cli.command()
+@click.option(
+    "--global", "is_global", is_flag=True, help="Initialize global configuration"
+)
+def init(is_global):
+    """Initialize GitMuse configuration"""
+    if is_global:
+        init_config(os.path.expanduser("~/gitmuse.json"))
+    else:
+        init_config()
+
+
+def run_commit() -> None:
     """
-    Run the command-line interface (CLI) to handle commits based on the specified provider.
+    Run the commit command based on the specified provider.
     Checks the provider environment variable and configures the corresponding provider (OpenAI or Ollama).
     Raises errors if the provider is unsupported, API key is missing for OpenAI, or Ollama is not accessible.
     """
     try:
-        provider = os.getenv("PROVIDER", DEFAULT_PROVIDER)
+        provider = os.getenv("PROVIDER", get_ai_provider())
 
         if provider == "openai":
-            openai_api_key = os.getenv("OPENAI_API_KEY")
+            openai_api_key = os.getenv("OPENAI_API_KEY") or get_openai_api_key()
             if not openai_api_key:
                 raise RuntimeError(
-                    "OpenAI API key not found. Please set the OPENAI_API_KEY environment variable."
+                    "OpenAI API key not found. Please set the OPENAI_API_KEY environment variable or in the configuration file."
                 )
             OpenAIProvider.configure(openai_api_key)
         elif provider == "ollama":
@@ -36,3 +61,11 @@ def run_cli() -> None:
 
     except (RuntimeError, ValueError) as e:
         console.print(f":x: [bold red]Error:[/bold red] {e}")
+
+
+def run_cli():
+    cli()
+
+
+if __name__ == "__main__":
+    run_cli()

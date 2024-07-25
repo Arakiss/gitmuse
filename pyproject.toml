@@ -32,6 +32,8 @@ ruff = "^0.5.4"
 ollama = "^0.3.0"
 openai = "^1.37.0"
 toml = "^0.10.2"
+jsonschema = "^4.23.0"
+click = "^8.1.7"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.11.0"

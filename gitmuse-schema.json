@@ -1,0 +1,71 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"type": "object",
+	"properties": {
+		"version": { "type": "integer", "enum": [1] },
+		"ai": {
+			"type": "object",
+			"properties": {
+				"provider": { "type": "string", "enum": ["ollama", "openai"] },
+				"openai": {
+					"type": "object",
+					"properties": {
+						"model": { "type": "string" },
+						"apiKey": { "type": "string" },
+						"organizationId": { "type": "string" }
+					},
+					"required": ["model"]
+				},
+				"ollama": {
+					"type": "object",
+					"properties": {
+						"model": { "type": "string" },
+						"url": { "type": "string", "format": "uri" }
+					},
+					"required": ["model", "url"]
+				}
+			},
+			"required": ["provider"]
+		},
+		"commit": {
+			"type": "object",
+			"properties": {
+				"style": {
+					"type": "string",
+					"enum": ["conventional", "gitmoji", "custom"]
+				},
+				"maxLength": { "type": "integer", "minimum": 1 },
+				"includeScope": { "type": "boolean" },
+				"includeBody": { "type": "boolean" },
+				"includeFooter": { "type": "boolean" },
+				"conventionalCommitTypes": {
+					"type": "object",
+					"additionalProperties": { "type": "string" }
+				}
+			},
+			"required": [
+				"style",
+				"maxLength",
+				"includeScope",
+				"includeBody",
+				"includeFooter",
+				"conventionalCommitTypes"
+			]
+		},
+		"prompts": {
+			"type": "object",
+			"properties": {
+				"commitMessage": {
+					"type": "object",
+					"properties": {
+						"useDefault": { "type": "boolean" },
+						"customTemplate": { "type": "string" }
+					},
+					"required": ["useDefault"]
+				}
+			},
+			"required": ["commitMessage"]
+		}
+	},
+	"required": ["version", "ai", "commit", "prompts"]
+}
