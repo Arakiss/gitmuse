@@ -2,8 +2,9 @@ from typing import List, Tuple
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.panel import Panel
-from rich.prompt import Prompt, IntPrompt
+from rich.prompt import Prompt, IntPrompt, Confirm
 from rich.table import Table
+from rich.progress import Progress, SpinnerColumn, TextColumn
 import tempfile
 import subprocess
 import os
@@ -14,7 +15,7 @@ console = Console()
 def display_table(
     title: str, columns: List[Tuple[str, str]], rows: List[Tuple[str, str]]
 ) -> None:
-    table = Table(title=title, title_justify="full")
+    table = Table(title=title, title_justify="left", style="bold magenta")
     for col_name, col_style in columns:
         table.add_column(col_name, style=col_style)
 
@@ -55,7 +56,7 @@ def display_diff(diff: str) -> None:
     view_option = Prompt.ask(
         "How would you like to view the diff?",
         choices=["full", "summary", "none"],
-        default="none",
+        default="summary",
     )
     if view_option == "none":
         console.print("[bold blue]Diff view skipped.[/bold blue]")
@@ -104,13 +105,33 @@ def edit_commit_message(initial_message: str) -> str:
 
 
 def perform_commit(message: str) -> None:
-    try:
-        result = subprocess.run(
-            ["git", "commit", "-m", message], check=True, capture_output=True, text=True
-        )
-        console.print(result.stdout)
-    except subprocess.CalledProcessError as e:
-        console.print(f"[bold red]Error: Git commit failed.[/bold red]\n{e.stderr}")
+    if not Confirm.ask(
+        "[bold yellow]Are you sure you want to commit with this message?[/bold yellow]"
+    ):
+        console.print("[bold blue]Commit cancelled.[/bold blue]")
+        return
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("[cyan]Committing changes...", total=None)
+
+        try:
+            result = subprocess.run(
+                ["git", "commit", "-m", message],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            progress.update(task, completed=True)
+            console.print(
+                f"[bold green]Commit successfully created.[/bold green]\n{result.stdout}"
+            )
+        except subprocess.CalledProcessError as e:
+            progress.update(task, completed=True)
+            console.print(f"[bold red]Error: Git commit failed.[/bold red]\n{e.stderr}")
 
 
 def display_ai_model_info(provider: str) -> None:
