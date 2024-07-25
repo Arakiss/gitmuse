@@ -18,7 +18,7 @@ def display_changes(
     for status, file_path in staged_files:
         changes[status].append(file_path)
 
-    table = Table(title="Changes to be committed")
+    table = Table(title="Changes to be committed", title_justify="full")
     table.add_column("Status", style="cyan")
     table.add_column("File", style="green")
 
