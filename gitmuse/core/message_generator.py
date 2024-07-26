@@ -57,6 +57,20 @@ def get_provider(provider: Optional[str] = None) -> AIProvider:
         raise ValueError(f"Unsupported provider: {provider_name}")
 
 
+def load_template(provider: str) -> str:
+    template_path = f"templates/{provider}_template.txt"
+    if os.path.exists(template_path):
+        with open(template_path, "r", encoding="utf-8") as file:
+            return file.read()
+    else:
+        if provider == "openai":
+            return load_default_template()
+        elif provider == "ollama":
+            return OllamaProvider.format_prompt_for_llama("")
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
+
+
 def load_default_template() -> str:
     default_template = """
     Generate a semantic commit message for the following changes:
@@ -95,7 +109,8 @@ def create_prompt_content(
 ) -> str:
     commit_types = CONFIG.get_conventional_commit_types()
     keywords = ", ".join([f"{emoji} {verb}" for verb, emoji in commit_types.items()])
-    template = custom_template if not use_default_template else load_default_template()
+    provider = CONFIG.get_ai_provider()
+    template = custom_template if not use_default_template else load_template(provider)
 
     return template.format(
         files_summary=changes.files_summary,
