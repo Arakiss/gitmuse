@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.panel import Panel
@@ -8,16 +8,28 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 import tempfile
 import subprocess
 import os
+from pydantic import BaseModel
 from gitmuse.utils.logging import get_logger
 
 logger = get_logger(__name__)
 console = Console()
 
 
+class StagedFile(BaseModel):
+    status: str
+    file_path: str
+
+
+class IgnoredFile(BaseModel):
+    file_path: str
+
+
 def display_table(
     title: str, columns: List[Tuple[str, str]], rows: List[Tuple[str, str]]
 ) -> None:
-    table = Table(title=title, title_justify="left", style="bold magenta")
+    table = Table(
+        title=title, title_justify="left", style="bold magenta"
+    )  # Cambiado a "bold magenta"
     for col_name, col_style in columns:
         table.add_column(col_name, style=col_style)
 
@@ -29,17 +41,17 @@ def display_table(
 
 
 def display_changes(
-    staged_files: List[Tuple[str, str]], ignored_files: List[str]
+    staged_files: List[Tuple[str, str]], ignored_files: List[IgnoredFile]
 ) -> None:
-    changes = {"A": [], "M": [], "D": []}
+    changes: Dict[str, List[str]] = {"A": [], "M": [], "D": []}
     for status, file_path in staged_files:
         changes[status].append(file_path)
 
-    rows = []
+    rows: List[Tuple[str, str]] = []
     for status, files in changes.items():
         status_word = {"A": "New file", "M": "Modified", "D": "Deleted"}[status]
-        for file in files:
-            rows.append((status_word, file))
+        for file_path in files:
+            rows.append((status_word, file_path))
 
     display_table(
         "Changes to be committed", [("Status", "cyan"), ("File", "green")], rows
@@ -50,8 +62,8 @@ def display_changes(
         console.print(
             f"\n[bold yellow]Ignored {ignored_count} file(s) based on .gitignore rules:[/bold yellow]"
         )
-        for file in ignored_files[:5]:
-            console.print(f"  - {file}")
+        for ignored_file in ignored_files[:5]:
+            console.print(f"  - {ignored_file.file_path}")
         if ignored_count > 5:
             console.print(f"  ... and {ignored_count - 5} more")
         logger.info(f"Ignored {ignored_count} files based on .gitignore rules")
@@ -162,9 +174,18 @@ def display_ai_model_info(provider: str) -> None:
 
 if __name__ == "__main__":
     # Test functions
-    staged_files = [("M", "file1.py"), ("A", "file2.md"), ("D", "file3.js")]
-    ignored_files = ["ignored1.txt", "ignored2.log"]
-    display_changes(staged_files, ignored_files)
+    staged_files = [
+        StagedFile(status="M", file_path="file1.py"),
+        StagedFile(status="A", file_path="file2.md"),
+        StagedFile(status="D", file_path="file3.js"),
+    ]
+    ignored_files = [
+        IgnoredFile(file_path="ignored1.txt"),
+        IgnoredFile(file_path="ignored2.log"),
+    ]
+    display_changes(
+        [(file.status, file.file_path) for file in staged_files], ignored_files
+    )
 
     sample_diff = "diff --git a/file1.py b/file1.py\n--- a/file1.py\n+++ b/file1.py\n@@ -1,3 +1,4 @@\n print('hello')\n+print('world')\n"
     display_diff(sample_diff)
