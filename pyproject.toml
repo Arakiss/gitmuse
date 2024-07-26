@@ -1,17 +1,16 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "gitmuse"
-version = "0.1.4"
 description = "GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages."
-authors = [
-    {name = "Petru Arakiss", email = "petruarakiss@gmail.com"},
-]
 readme = "README.md"
-requires-python = ">=3.11,<4.0"
-license = {file = "LICENSE"}
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Petru Arakiss", email = "petruarakiss@gmail.com" }]
+dynamic = ["version"]
+keywords = ["git", "gpt", "openai", "cli", "productivity", "commit-messages"]
 classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Software Development",
@@ -23,39 +22,55 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
 ]
-keywords = ["git", "gpt", "openai", "cli", "productivity", "commit-messages"]
 dependencies = [
-    "rich>=13.1.0,<14.0.0",
-    "ruff>=0.5.4,<0.6.0",
-    "ollama>=0.3.0,<0.4.0",
-    "openai>=1.37.0,<2.0.0",
-    "toml>=0.10.2,<0.11.0",
-    "jsonschema>=4.23.0,<5.0.0",
-    "click>=8.1.7,<9.0.0",
-    "structlog>=24.4.0,<25.0.0",
-    "pydantic>=2.8.2,<3.0.0",
+    "rich >= 13.1.0, < 14.0.0",
+    "ruff >= 0.5.4, < 0.6.0",
+    "ollama >= 0.3.0, < 0.4.0",
+    "openai >= 1.37.0, < 2.0.0",
+    "toml >= 0.10.2, < 0.11.0",
+    "jsonschema >= 4.23.0, < 5.0.0",
+    "click >= 8.1.7, < 9.0.0",
+    "structlog >= 24.4.0, < 25.0.0",
+    "pydantic >= 2.8.2, < 3.0.0",
 ]
 
-[project.urls]
-Homepage = "https://github.com/Arakiss/gitmuse"
-Repository = "https://github.com/Arakiss/gitmuse"
-Documentation = "https://github.com/Arakiss/gitmuse/wiki"
+[project.optional-dependencies]
+dev = [
+    "mypy >= 1.11.0, < 2.0.0",
+    "pytest >= 8.3.1, < 9.0.0",
+    "types-jsonschema >= 4.23.0, < 5.0.0",
+]
 
 [project.scripts]
 gitmuse = "gitmuse.__main__:main"
 
-[tool.setuptools.packages.find]
-include = ["gitmuse", "gitmuse.*"]
+[project.urls]
+homepage = "https://github.com/Arakiss/gitmuse"
+repository = "https://github.com/Arakiss/gitmuse"
+documentation = "https://github.com/Arakiss/gitmuse/wiki"
+
+[tool.hatch.version]
+path = "gitmuse/__version__.py"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["gitmuse"]
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "gitmuse",
+    "tests",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
 
 [tool.poetry]
 name = "gitmuse"
-version = "0.1.4"
+version = "0.1.5"
 description = "GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages."
 authors = ["Petru Arakiss <petruarakiss@gmail.com>"]
 readme = "README.md"
-packages = [
-    { include = "gitmuse" },
-]
+packages = [{ include = "gitmuse" }]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"

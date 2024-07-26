@@ -22,11 +22,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install poetry
-        poetry install --with dev
+        pip install hatch
 
     - name: Build package
-      run: poetry build
+      run: hatch build
 
     - name: Store the distribution packages
       uses: actions/upload-artifact@v3
@@ -77,3 +76,15 @@ jobs:
         files: dist/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Verify package installation
+      run: |
+        python -m venv test_env
+        source test_env/bin/activate
+        pip install gitmuse==${{ github.ref_name }}
+        gitmuse --version
