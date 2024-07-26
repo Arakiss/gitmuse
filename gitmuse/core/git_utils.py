@@ -4,14 +4,26 @@ from typing import List, Optional, Set, Sequence, Literal
 import fnmatch
 from rich.console import Console
 from functools import lru_cache
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 console = Console()
 
 
 class StagedFile(BaseModel):
-    status: Literal["A", "M", "D"]
+    status: Literal["A", "M", "D", "R100"]  # Add any additional status you need here
     file_path: str
+
+    @validator("status")
+    def validate_status(cls, v):
+        allowed_statuses = [
+            "A",
+            "M",
+            "D",
+            "R100",
+        ]  # Add any additional status you need here
+        if v not in allowed_statuses:
+            raise ValueError("Input should be 'A', 'M', 'D' or 'R100'")
+        return v
 
 
 def run_command(

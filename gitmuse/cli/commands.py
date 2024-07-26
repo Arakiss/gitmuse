@@ -19,6 +19,7 @@ from gitmuse.cli.ui import (
     display_ai_model_info,
 )
 from gitmuse.utils.logging import get_logger
+from gitmuse.config.settings import CONFIG, ConfigError
 
 logger = get_logger(__name__)
 console = Console()
@@ -84,7 +85,25 @@ def commit_command(provider: str) -> None:
         display_diff(diff_content)
 
         display_ai_model_info(provider)
-        commit_msg: str = generate_commit_message(diff_content, provider=provider)
+
+        try:
+            use_default_template = CONFIG.get_nested_config(
+                "prompts", "commitMessage", "useDefault"
+            )
+            custom_template = CONFIG.get_nested_config(
+                "prompts", "commitMessage", "customTemplate"
+            )
+        except ConfigError as e:
+            logger.error(f"Error accessing commit message configuration: {str(e)}")
+            use_default_template = True
+            custom_template = ""
+
+        commit_msg: str = generate_commit_message(
+            diff_content,
+            provider=provider,
+            use_default_template=use_default_template,
+            custom_template=custom_template,
+        )
 
         logger.info("Generated commit message")
         console.print(Panel(commit_msg, title="Generated commit message", expand=False))

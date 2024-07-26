@@ -12,17 +12,21 @@
 					"properties": {
 						"model": { "type": "string" },
 						"apiKey": { "type": "string" },
-						"organizationId": { "type": "string" }
+						"organizationId": { "type": "string" },
+						"max_tokens": { "type": "integer" },
+						"temperature": { "type": "number" }
 					},
-					"required": ["model"]
+					"required": ["model", "max_tokens", "temperature"]
 				},
 				"ollama": {
 					"type": "object",
 					"properties": {
 						"model": { "type": "string" },
-						"url": { "type": "string", "format": "uri" }
+						"url": { "type": "string", "format": "uri" },
+						"max_tokens": { "type": "integer" },
+						"temperature": { "type": "number" }
 					},
-					"required": ["model", "url"]
+					"required": ["model", "url", "max_tokens", "temperature"]
 				}
 			},
 			"required": ["provider"]
@@ -65,7 +69,16 @@
 				}
 			},
 			"required": ["commitMessage"]
+		},
+		"logging": {
+			"type": "object",
+			"properties": {
+				"level": { "type": "string" },
+				"format": { "type": "string" },
+				"file": { "type": "string", "nullable": true }
+			},
+			"required": ["level", "format"]
 		}
 	},
-	"required": ["version", "ai", "commit", "prompts"]
+	"required": ["version", "ai", "commit", "prompts", "logging"]
 }

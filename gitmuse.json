@@ -4,13 +4,17 @@
 	"ai": {
 		"provider": "ollama",
 		"openai": {
-			"model": "gpt4o",
+			"model": "gpt-4o",
 			"apiKey": "",
-			"organizationId": ""
+			"organizationId": "",
+			"max_tokens": 1000,
+			"temperature": 0.7
 		},
 		"ollama": {
 			"model": "llama3.1",
-			"url": "http://localhost:11434"
+			"url": "http://localhost:11434",
+			"max_tokens": 1000,
+			"temperature": 0.7
 		}
 	},
 	"commit": {
@@ -37,5 +41,10 @@
 			"useDefault": true,
 			"customTemplate": ""
 		}
+	},
+	"logging": {
+		"level": "INFO",
+		"format": "console",
+		"file": ""
 	}
 }

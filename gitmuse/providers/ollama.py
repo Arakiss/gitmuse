@@ -1,6 +1,6 @@
 from functools import lru_cache
-from typing import Optional, Dict, Any
-from gitmuse.providers.base import AIProvider
+from typing import Optional, Dict, Any, Mapping, cast
+from gitmuse.providers.base import AIProvider, AIProviderConfig
 import ollama
 from gitmuse.utils.logging import get_logger
 from gitmuse.config.settings import CONFIG
@@ -11,18 +11,18 @@ logger = get_logger(__name__)
 @lru_cache(maxsize=1)
 def get_ollama_status() -> Optional[Dict[str, Any]]:
     try:
-        return ollama.ps()
+        return cast(Dict[str, Any], ollama.ps())
     except Exception as e:
         logger.error(f"Error checking Ollama status: {e}")
         return None
 
 
 class OllamaProvider(AIProvider):
-    def __init__(self, model_name: Optional[str] = None):
-        super().__init__(model_name or CONFIG.get_ai_model())
+    def __init__(self, config: AIProviderConfig):
+        super().__init__(config)
         self.status = get_ollama_status()
         self.url = CONFIG.get_ollama_url()
-        logger.info(f"Initialized OllamaProvider with model {self.model}")
+        logger.info(f"Initialized OllamaProvider with model {self.config.model}")
 
     def generate_commit_message(self, prompt: str) -> str:
         if not self.status:
@@ -35,9 +35,9 @@ class OllamaProvider(AIProvider):
             try:
                 formatted_prompt = self.format_prompt_for_llama(prompt)
                 response = ollama.generate(
-                    model=self.model,
+                    model=self.config.model,
                     prompt=formatted_prompt,
-                    options=self.get_generation_options(),
+                    options=cast(ollama.Options, self.get_generation_options()),
                 )
                 progress.update(task, completed=True)
                 return self.process_ollama_response(response)
@@ -46,34 +46,35 @@ class OllamaProvider(AIProvider):
                 logger.error(f"Error generating commit message with Ollama: {e}")
                 return "📝 Update files\n\nSummary of changes."
 
-    @staticmethod
-    def get_generation_options() -> Dict[str, Any]:
+    def get_generation_options(self) -> Dict[str, Any]:
         return {
-            "temperature": 0.6,
+            "temperature": self.config.temperature,
             "top_p": 0.9,
             "top_k": 40,
-            "num_predict": 256,
+            "num_predict": self.config.max_tokens,
         }
 
     @staticmethod
     def format_prompt_for_llama(prompt: str) -> str:
-        system_message = """You are an AI assistant specialized in generating git commit messages. Your task is to create concise, informative, and well-structured commit messages based on the provided information.
+        system_message = """You are an AI assistant specialized in generating semantic git commit messages. Your task is to create concise, informative, and well-structured commit messages based on the provided information.
 
-Guidelines for generating commit messages:
-1. Start with an emoji that represents the type of change, followed by an imperative present tense verb.
-2. Keep the first line (summary) under 50 characters, including the emoji.
-3. Leave a blank line after the summary.
-4. Provide 2-3 bullet points explaining key changes, each starting with a dash (-).
-5. Focus on the 'what' and 'why' of the changes, not the 'how'.
-6. Do not include file names or technical details unless absolutely necessary.
-7. Do not add any notes, explanations, or comments about the commit message itself.
+Guidelines for generating semantic commit messages:
+1. Use one of the following types: feat, fix, docs, style, refactor, perf, test, build, ci, chore
+2. Format: <type>[optional scope]: <description>
+3. The description should be in lowercase and not end with a period
+4. Keep the first line (header) under 50 characters
+5. After the header, add a blank line followed by a more detailed description
+6. In the description, explain the 'what' and 'why' of the changes, not the 'how'
+7. Use bullet points (- ) for multiple lines in the description
+8. Do not include file names or technical details unless absolutely necessary
+9. For breaking changes, add BREAKING CHANGE: at the beginning of the footer or body section
 
 Format the message exactly like this:
-🎨 Verb Summary of changes
+type(optional scope): short description
 
-- Key change 1
-- Key change 2
-- Key change 3 (if necessary)
+- Detailed explanation of the changes
+- Reason for the changes
+- Any breaking changes (if applicable)
 
 Respond ONLY with the commit message, no additional text or explanations."""
 
@@ -82,7 +83,7 @@ Respond ONLY with the commit message, no additional text or explanations."""
 {prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 """
 
-    def process_ollama_response(self, response: Dict[str, Any]) -> str:
+    def process_ollama_response(self, response: Mapping[str, Any]) -> str:
         generated_message = response.get("response", "").strip()
         if not generated_message:
             logger.warning("Ollama returned an empty response")
@@ -106,7 +107,7 @@ Respond ONLY with the commit message, no additional text or explanations."""
         return status is not None
 
     def __repr__(self) -> str:
-        return f"OllamaProvider(model_name='{self.model}', status={'Available' if self.status else 'Unavailable'}, url='{self.url}')"
+        return f"OllamaProvider(model_name='{self.config.model}', status={'Available' if self.status else 'Unavailable'}, url='{self.url}')"
 
 
 if __name__ == "__main__":
@@ -121,8 +122,11 @@ if __name__ == "__main__":
     +from gitmuse.config.settings import ADDITIONAL_IGNORE_PATTERNS
 
     def analyze_diff(diff):
-        lines = diff.split('\n')
+        lines = diff.split('\\n')
     """
-    provider = OllamaProvider()
+    config = AIProviderConfig(
+        model=CONFIG.get_ai_model(), max_tokens=256, temperature=0.6
+    )
+    provider = OllamaProvider(config)
     commit_message = provider.generate_commit_message(sample_diff)
     logger.info(f"Generated commit message:\n{commit_message}")
