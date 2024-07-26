@@ -1,10 +1,10 @@
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "gitmuse"
-version = "0.1.3"
+version = "0.1.4"
 description = "GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages."
 authors = [
     {name = "Petru Arakiss", email = "petruarakiss@gmail.com"},
@@ -44,9 +44,12 @@ Documentation = "https://github.com/Arakiss/gitmuse/wiki"
 [project.scripts]
 gitmuse = "gitmuse.__main__:main"
 
+[tool.setuptools.packages.find]
+include = ["gitmuse", "gitmuse.*"]
+
 [tool.poetry]
 name = "gitmuse"
-version = "0.1.3"
+version = "0.1.4"
 description = "GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages."
 authors = ["Petru Arakiss <petruarakiss@gmail.com>"]
 readme = "README.md"
