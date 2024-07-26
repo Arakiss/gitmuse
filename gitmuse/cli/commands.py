@@ -27,11 +27,11 @@ def get_commit_files(
     staged_files: List[Tuple[str, str]], ignore_patterns: Set[str]
 ) -> Tuple[List[Tuple[str, str]], List[str], str]:
     diff_content = ""
-    ignored_files = []
-    files_to_commit = []
+    ignored_files: List[str] = []
+    files_to_commit: List[Tuple[str, str]] = []
 
     for status, file_path in staged_files:
-        if should_ignore(file_path, ignore_patterns):
+        if should_ignore(file_path, ignore_patterns, staged_files):
             ignored_files.append(file_path)
         elif status != "D":  # Skip deleted files
             file_diff = get_diff(file_path)

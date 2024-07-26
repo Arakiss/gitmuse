@@ -37,7 +37,7 @@ def check_staging_area() -> bool:
 @lru_cache(maxsize=1)
 def get_staged_files() -> List[Tuple[str, str]]:
     result = run_command(["git", "diff", "--cached", "--name-status"])
-    staged_files = []
+    staged_files: List[Tuple[str, str]] = []
     for line in result.stdout.splitlines():
         parts = line.split("\t")
         if len(parts) >= 2:
@@ -46,12 +46,13 @@ def get_staged_files() -> List[Tuple[str, str]]:
             console.print(
                 f"[bold yellow]Warning: Unexpected git diff output: {line}[/bold yellow]"
             )
+    console.print(f"Staged files: {staged_files}")
     return staged_files
 
 
 @lru_cache(maxsize=1)
 def get_gitignore_patterns() -> Set[str]:
-    ignore_patterns = set()
+    ignore_patterns: Set[str] = set()
     for root, _, files in os.walk("."):
         if ".gitignore" in files:
             with open(os.path.join(root, ".gitignore"), "r") as f:
@@ -60,18 +61,25 @@ def get_gitignore_patterns() -> Set[str]:
                     for line in f
                     if line.strip() and not line.startswith("#")
                 )
+    console.print(f"Loaded gitignore patterns: {ignore_patterns}")
     return ignore_patterns
 
 
-def should_ignore(file_path: str, ignore_patterns: Set[str]) -> bool:
-    return any(
-        fnmatch.fnmatch(file_path, pattern[1:])
-        if pattern.startswith("/")
-        else fnmatch.fnmatch(file_path, pattern)
-        if "/" in pattern
-        else fnmatch.fnmatch(os.path.basename(file_path), pattern)
-        for pattern in ignore_patterns
-    )
+def should_ignore(
+    file_path: str, ignore_patterns: Set[str], staged_files: List[Tuple[str, str]]
+) -> bool:
+    if file_path in [file for _, file in staged_files]:
+        return False
+    for pattern in ignore_patterns:
+        if (
+            (pattern.startswith("/") and fnmatch.fnmatch(file_path, pattern[1:]))
+            or (fnmatch.fnmatch(file_path, pattern))
+            or ("/" in pattern and fnmatch.fnmatch(file_path, pattern))
+            or (fnmatch.fnmatch(os.path.basename(file_path), pattern))
+        ):
+            console.print(f"File {file_path} ignored due to pattern: {pattern}")
+            return True
+    return False
 
 
 def get_file_content(file_path: str, revision: str = "HEAD") -> str:
