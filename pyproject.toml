@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "gitmuse"
-version = "0.1.0"
+version = "0.1.1"
 description = "GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages."
 authors = ["Petru Arakiss <petruarakiss@gmail.com>"]
 readme = "README.md"
