@@ -68,7 +68,7 @@ class GitDiffAnalyzer:
 
         return filtered_diff, ignored_files
 
-    def _get_file_contents(self, status: FileStatus, file_path: str) -> Tuple[str, str]:
+    def _get_file_contents(self, status: str, file_path: str) -> Tuple[str, str]:
         """
         Gets the file contents based on the status.
 
@@ -173,7 +173,7 @@ class GitDiffAnalyzer:
         """
         changes[status].append({"file": file, "content": "".join(content).strip()})
 
-    def _get_status_emoji(self, status: FileStatus) -> str:
+    def _get_status_emoji(self, status: str) -> str:
         """
         Gets the corresponding emoji for a file status.
 

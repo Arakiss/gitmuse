@@ -17,6 +17,7 @@ from gitmuse.cli.ui import (
     edit_commit_message,
     perform_commit,
     display_ai_model_info,
+    IgnoredFile,  # Asegúrate de importar IgnoredFile desde gitmuse.cli.ui
 )
 from gitmuse.utils.logging import get_logger
 from gitmuse.config.settings import CONFIG, ConfigError
@@ -27,14 +28,14 @@ console = Console()
 
 def get_commit_files(
     staged_files: List[StagedFile], ignore_patterns: Set[str]
-) -> Tuple[List[StagedFile], List[str], str]:
+) -> Tuple[List[StagedFile], List[IgnoredFile], str]:
     diff_content = ""
-    ignored_files: List[str] = []
+    ignored_files: List[IgnoredFile] = []
     files_to_commit: List[StagedFile] = []
 
     for file in staged_files:
         if should_ignore(file.file_path, ignore_patterns, staged_files):
-            ignored_files.append(file.file_path)
+            ignored_files.append(IgnoredFile(file_path=file.file_path))
         elif file.status != "D":  # Skip deleted files
             file_diff = get_diff(file.file_path)
             if file_diff:
