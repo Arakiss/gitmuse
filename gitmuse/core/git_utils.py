@@ -1,11 +1,17 @@
 import os
 import subprocess
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Set, Sequence, Literal
 import fnmatch
 from rich.console import Console
 from functools import lru_cache
+from pydantic import BaseModel
 
 console = Console()
+
+
+class StagedFile(BaseModel):
+    status: Literal["A", "M", "D"]
+    file_path: str
 
 
 def run_command(
@@ -35,13 +41,13 @@ def check_staging_area() -> bool:
 
 
 @lru_cache(maxsize=1)
-def get_staged_files() -> List[Tuple[str, str]]:
+def get_staged_files() -> List[StagedFile]:
     result = run_command(["git", "diff", "--cached", "--name-status"])
-    staged_files: List[Tuple[str, str]] = []
+    staged_files: List[StagedFile] = []
     for line in result.stdout.splitlines():
         parts = line.split("\t")
         if len(parts) >= 2:
-            staged_files.append((parts[0], parts[1]))
+            staged_files.append(StagedFile(status=parts[0], file_path=parts[1]))
         else:
             console.print(
                 f"[bold yellow]Warning: Unexpected git diff output: {line}[/bold yellow]"
@@ -66,9 +72,9 @@ def get_gitignore_patterns() -> Set[str]:
 
 
 def should_ignore(
-    file_path: str, ignore_patterns: Set[str], staged_files: List[Tuple[str, str]]
+    file_path: str, ignore_patterns: Set[str], staged_files: Sequence[StagedFile]
 ) -> bool:
-    if file_path in [file for _, file in staged_files]:
+    if file_path in [file.file_path for file in staged_files]:
         return False
     for pattern in ignore_patterns:
         if (
@@ -139,15 +145,15 @@ if __name__ == "__main__":
 
     print("\nGetting staged files...")
     staged_files = get_staged_files()
-    for status, file in staged_files:
-        print(f"{status}: {file}")
+    for file in staged_files:
+        print(f"{file.status}: {file.file_path}")
 
     print("\nGetting .gitignore patterns...")
     ignore_patterns = get_gitignore_patterns()
     print(f"Ignore patterns: {ignore_patterns}")
 
     if staged_files:
-        test_file = staged_files[0][1]
+        test_file = staged_files[0].file_path
         print(f"\nGetting content for {test_file}...")
         content = get_file_content(test_file, "staged")
         print(f"Content preview: {content[:100]}...")

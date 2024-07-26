@@ -8,6 +8,7 @@ from gitmuse.core.git_utils import (
     get_staged_files,
     get_diff,
     should_ignore,
+    StagedFile,
 )
 from gitmuse.core.message_generator import generate_commit_message
 from gitmuse.cli.ui import (
@@ -24,22 +25,24 @@ console = Console()
 
 
 def get_commit_files(
-    staged_files: List[Tuple[str, str]], ignore_patterns: Set[str]
-) -> Tuple[List[Tuple[str, str]], List[str], str]:
+    staged_files: List[StagedFile], ignore_patterns: Set[str]
+) -> Tuple[List[StagedFile], List[str], str]:
     diff_content = ""
     ignored_files: List[str] = []
-    files_to_commit: List[Tuple[str, str]] = []
+    files_to_commit: List[StagedFile] = []
 
-    for status, file_path in staged_files:
-        if should_ignore(file_path, ignore_patterns, staged_files):
-            ignored_files.append(file_path)
-        elif status != "D":  # Skip deleted files
-            file_diff = get_diff(file_path)
+    for file in staged_files:
+        if should_ignore(file.file_path, ignore_patterns, staged_files):
+            ignored_files.append(file.file_path)
+        elif file.status != "D":  # Skip deleted files
+            file_diff = get_diff(file.file_path)
             if file_diff:
-                diff_content += f"File: {file_path}\nStatus: {status}\n{file_diff}\n\n"
-                files_to_commit.append((status, file_path))
+                diff_content += (
+                    f"File: {file.file_path}\nStatus: {file.status}\n{file_diff}\n\n"
+                )
+                files_to_commit.append(file)
         else:
-            files_to_commit.append((status, file_path))
+            files_to_commit.append(file)
 
     return files_to_commit, ignored_files, diff_content
 
@@ -54,7 +57,7 @@ def commit_command(provider: str) -> None:
             return
 
         ignore_patterns: Set[str] = get_gitignore_patterns()
-        staged_files: List[Tuple[str, str]] = get_staged_files()
+        staged_files: List[StagedFile] = get_staged_files()
 
         if not staged_files:
             logger.warning("No changes to commit.")
@@ -72,7 +75,12 @@ def commit_command(provider: str) -> None:
             )
             return
 
-        display_changes(files_to_commit, ignored_files)
+        # Convert StagedFile instances to tuples for display_changes
+        files_to_commit_tuples: List[Tuple[str, str]] = [
+            (file.status, file.file_path) for file in files_to_commit
+        ]
+
+        display_changes(files_to_commit_tuples, ignored_files)
         display_diff(diff_content)
 
         display_ai_model_info(provider)

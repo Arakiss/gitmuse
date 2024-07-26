@@ -1,10 +1,11 @@
-from typing import List, Tuple, Set, Dict, Literal
+from typing import List, Tuple, Set, Dict, Literal, Sequence
 import difflib
 from gitmuse.core.git_utils import (
     get_gitignore_patterns,
     get_staged_files,
     run_command,
     should_ignore,
+    StagedFile,
 )
 from rich.console import Console
 from rich.progress import Progress
@@ -26,21 +27,21 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 class GitDiffAnalyzer:
-    def __init__(self, ignore_patterns: Set[str]):
+    def __init__(self, ignore_patterns: Set[str], staged_files: Sequence[StagedFile]):
         """
         Initializes the GitDiffAnalyzer.
 
         :param ignore_patterns: A set of file patterns to ignore.
+        :param staged_files: A list of StagedFile instances containing the status and path of staged files.
         """
         self.ignore_patterns = ignore_patterns.union(ADDITIONAL_IGNORE_PATTERNS)
+        self.staged_files = staged_files
 
-    def get_diff(
-        self, staged_files: List[Tuple[FileStatus, str]]
-    ) -> Tuple[str, List[str]]:
+    def get_diff(self, staged_files: Sequence[StagedFile]) -> Tuple[str, List[str]]:
         """
         Gets the diff for the staged files.
 
-        :param staged_files: A list of tuples containing the status and path of staged files.
+        :param staged_files: A list of StagedFile instances containing the status and path of staged files.
         :return: A tuple with the filtered diff and a list of ignored files.
         """
         filtered_diff = ""
@@ -51,17 +52,19 @@ class GitDiffAnalyzer:
                 "[cyan]Processing staged files...", total=len(staged_files)
             )
 
-            for status, file_path in staged_files:
+            for file in staged_files:
                 progress.update(task, advance=1)
-                if should_ignore(file_path, self.ignore_patterns):
-                    ignored_files.append(file_path)
-                    logging.info(f"Ignored file: {file_path}")
+                if should_ignore(file.file_path, self.ignore_patterns, staged_files):
+                    ignored_files.append(file.file_path)
+                    logging.info(f"Ignored file: {file.file_path}")
                     continue
 
-                old_content, new_content = self._get_file_contents(status, file_path)
-                diff = self._generate_diff(file_path, old_content, new_content)
-                emoji_status = self._get_status_emoji(status)
-                filtered_diff += f"{emoji_status} File: {file_path}\nStatus: {status}\n{''.join(diff)}\n"
+                old_content, new_content = self._get_file_contents(
+                    file.status, file.file_path
+                )
+                diff = self._generate_diff(file.file_path, old_content, new_content)
+                emoji_status = self._get_status_emoji(file.status)
+                filtered_diff += f"{emoji_status} File: {file.file_path}\nStatus: {file.status}\n{''.join(diff)}\n"
 
         return filtered_diff, ignored_files
 
@@ -124,10 +127,14 @@ class GitDiffAnalyzer:
         :param diff: The diff as a string.
         :return: A dictionary with categorized changes.
         """
-        changes = {"added": [], "modified": [], "deleted": []}
+        changes: Dict[str, List[Dict[str, str]]] = {
+            "added": [],
+            "modified": [],
+            "deleted": [],
+        }
         current_file = ""
         current_status = ""
-        current_content = []
+        current_content: List[str] = []
 
         for line in diff.split("\n"):
             if line.startswith("File:"):
@@ -155,7 +162,7 @@ class GitDiffAnalyzer:
         status: str,
         file: str,
         content: List[str],
-    ):
+    ) -> None:
         """
         Appends a change to the changes dictionary.
 
@@ -183,7 +190,7 @@ def analyze_diff(diff: str) -> Dict[str, List[Dict[str, str]]]:
     :param diff: The diff as a string.
     :return: A dictionary with categorized changes.
     """
-    analyzer = GitDiffAnalyzer(set())
+    analyzer = GitDiffAnalyzer(set(), [])
     return analyzer.analyze_diff(diff)
 
 
@@ -224,12 +231,12 @@ def display_analysis(
 
 def main() -> None:
     ignore_patterns = get_gitignore_patterns()
-    staged_files = get_staged_files()
+    staged_files: List[StagedFile] = get_staged_files()
     if not staged_files:
         console.print("[bold yellow]No changes to commit.[/bold yellow]")
         return
 
-    analyzer = GitDiffAnalyzer(ignore_patterns)
+    analyzer = GitDiffAnalyzer(ignore_patterns, staged_files)
     diff, ignored_files = analyzer.get_diff(staged_files)
     analysis = analyzer.analyze_diff(diff)
     display_analysis(analysis, ignored_files)
