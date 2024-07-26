@@ -2,12 +2,14 @@
 
 GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages. By analyzing your staged changes, GitMuse provides intelligent suggestions for your commit messages, making your Git history more informative and easier to navigate.
 
+[![Release](https://github.com/Arakiss/gitmuse/actions/workflows/release.yml/badge.svg)](https://github.com/Arakiss/gitmuse/actions/workflows/release.yml)
+
 ## Features
 
-- **AI-Powered Commit Messages**: Leverages advanced AI models to generate context-aware commit messages.
+- **AI-Powered Commit Messages**: Leverages OpenAI's GPT models or Ollama for locally hosted models to generate context-aware commit messages.
 - **Git Integration**: Seamlessly integrates with your existing Git workflow.
-- **Customizable**: Adapt the AI suggestions to match your team's commit message style and conventions.
-- **Interactive CLI**: User-friendly command-line interface for easy interaction.
+- **Customizable**: Configure AI providers, commit message styles, and other preferences via a JSON configuration file.
+- **Interactive CLI**: User-friendly command-line interface with rich formatting for easy interaction.
 - **Diff Analysis**: Intelligent analysis of your staged changes to provide accurate commit message suggestions.
 
 ## Installation
@@ -15,6 +17,8 @@ GitMuse is an AI-powered tool that helps developers craft meaningful and descrip
 ```bash
 pip install gitmuse
 ```
+
+Note: GitMuse requires Python 3.11 or higher.
 
 ## Usage
 
@@ -34,13 +38,31 @@ pip install gitmuse
 
 ## Configuration
 
-GitMuse can be configured to match your preferences. Create a `.gitmuserc` file in your home directory:
+GitMuse can be configured to match your preferences. Create a `gitmuse.json` file in your project root or home directory:
 
-```yaml
-ai_model: gpt-4
-commit_style: conventional
-max_message_length: 72
+```json
+{
+  "version": 1,
+  "ai": {
+    "provider": "ollama",
+    "ollama": {
+      "model": "llama3.1",
+      "url": "http://localhost:11434",
+      "max_tokens": 1000,
+      "temperature": 0.7
+    }
+  },
+  "commit": {
+    "style": "conventional",
+    "maxLength": 72,
+    "includeScope": true,
+    "includeBody": true,
+    "includeFooter": true
+  }
+}
 ```
+
+For more configuration options, refer to the `gitmuse-schema.json` file in the repository.
 
 ## Contributing
 
