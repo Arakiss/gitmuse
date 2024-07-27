@@ -4,9 +4,10 @@ GitMuse is an AI-powered tool that helps developers craft meaningful and descrip
 
 [![Release](https://github.com/Arakiss/gitmuse/actions/workflows/release.yml/badge.svg)](https://github.com/Arakiss/gitmuse/actions/workflows/release.yml)
 
-## Features
+## Key Features
 
-- **AI-Powered Commit Messages**: Leverages OpenAI's GPT models or Ollama for locally hosted models to generate context-aware commit messages.
+- **No Configuration Needed**: Works out-of-the-box with Llama 3.1 and Ollama.
+- **AI-Powered Commit Messages**: Leverages OpenAI's GPT models, or Ollama for locally hosted models, to generate context-aware commit messages.
 - **Git Integration**: Seamlessly integrates with your existing Git workflow.
 - **Customizable**: Configure AI providers, commit message styles, and other preferences via a JSON configuration file.
 - **Interactive CLI**: User-friendly command-line interface with rich formatting for easy interaction.
@@ -18,23 +19,33 @@ GitMuse is an AI-powered tool that helps developers craft meaningful and descrip
 pip install gitmuse
 ```
 
-Note: GitMuse requires Python 3.11 or higher.
+**Note**: GitMuse requires Python 3.11 or higher and Ollama installed with the Llama 3.1 model downloaded for zero configuration.
 
 ## Usage
 
-1. Stage your changes as you normally would:
+1. Ensure that Ollama is running:
+
+   ```bash
+   ollama serve
+   ```
+
+2. Stage your changes as you normally would:
 
    ```bash
    git add .
    ```
 
-2. Instead of using `git commit`, use GitMuse:
+3. Instead of using `git commit`, use GitMuse:
 
    ```bash
    gitmuse commit
    ```
 
-3. GitMuse will analyze your changes and suggest a commit message. You can accept, modify, or reject the suggestion.
+4. GitMuse will analyze your changes and suggest a commit message. You can accept, modify, or reject the suggestion.
+
+## Development Status
+
+GitMuse is currently in active development, but it is already fully functional with Llama 3.1 by default, requiring no additional configuration as long as Ollama is installed and the model is downloaded. It also works with OpenAI and any of their models by default.
 
 ## Configuration (Optional)
 
@@ -50,6 +61,10 @@ GitMuse can be configured to match your preferences. Optionally, create a `gitmu
       "url": "http://localhost:11434",
       "max_tokens": 1000,
       "temperature": 0.7
+    },
+    "openai": {
+      "model": "gpt-4",
+      "api_key": "your_openai_api_key"
     }
   },
   "commit": {
@@ -64,7 +79,18 @@ GitMuse can be configured to match your preferences. Optionally, create a `gitmu
 
 For more configuration options, refer to the `gitmuse-schema.json` file in the repository.
 
+## Roadmap
+
+- **Support for Additional AI Providers**:
+  - Groq
+  - AWS Bedrock
+  - Azure OpenAI Service
+
 ## FAQ
+
+### Why does GitMuse work by default with Ollama and Llama 3.1 8B?
+
+Llama 3.1 8B from Meta is one of the most advanced open-source language models available, released recently with significant improvements. It offers high precision, supports function calling, and has multilingual capabilities, making it an excellent default choice for generating high-quality, context-aware commit messages. It excels in various tasks including general knowledge, multilingual translation, and contextual understanding, making it highly versatile for developers needs.
 
 ### What should I do if I encounter issues during installation?
 
@@ -111,6 +137,6 @@ For more configuration options, refer to the `gitmuse-schema.json` file in the r
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for more details.
 
-## License
+## Support
 
-GitMuse is released under the MIT License. See the [LICENSE](LICENSE) file for more details.
+For support, visit our [GitHub Issues](https://github.com/Arakiss/gitmuse/issues).
