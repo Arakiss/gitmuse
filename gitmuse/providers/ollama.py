@@ -4,8 +4,10 @@ from gitmuse.providers.base import AIProvider, AIProviderConfig
 import ollama
 from gitmuse.utils.logging import get_logger
 from gitmuse.config.settings import CONFIG
+from rich.console import Console
 
 logger = get_logger(__name__)
+console = Console()
 
 
 @lru_cache(maxsize=1)
@@ -21,7 +23,7 @@ class OllamaProvider(AIProvider):
     def __init__(self, config: AIProviderConfig):
         super().__init__(config)
         self.status = get_ollama_status()
-        self.url = CONFIG.get_ollama_url()
+        self.url = CONFIG.get_ollama_url() or "http://localhost:11434"
         logger.info(f"Initialized OllamaProvider with model {self.config.model}")
 
     def generate_commit_message(self, prompt: str) -> str:
@@ -59,29 +61,28 @@ class OllamaProvider(AIProvider):
         system_message = """You are an AI assistant specialized in generating semantic git commit messages. Your task is to create concise, informative, and well-structured commit messages based on the provided information.
 
 Guidelines for generating semantic commit messages:
-1. Use one of the following types: feat, fix, docs, style, refactor, perf, test, build, ci, chore
-2. Format: <type>[optional scope]: <description>
-3. The description should be in lowercase and not end with a period
-4. Keep the first line (header) under 50 characters
-5. After the header, add a blank line followed by a more detailed description
-6. In the description, explain the 'what' and 'why' of the changes, not the 'how'
-7. Use bullet points (- ) for multiple lines in the description
-8. Do not include file names or technical details unless absolutely necessary
+1. Always start with the appropriate emoji followed by the commit type
+2. Use one of the following types with their corresponding emojis: 
+   ✨ feat, 🐛 fix, 📝 docs, 💎 style, ♻️ refactor, ⚡ perf, 🧪 test, 🏗️ build, 🚀 ci, 🧹 chore
+3. Format: <emoji> <type>[optional scope]: <description>
+4. The description should be in lowercase and not end with a period
+5. Keep the first line (header) under 50 characters
+6. After the header, add a blank line followed by a more detailed description
+7. In the description, explain the 'what' and 'why' of the changes, not the 'how'
+8. Use bullet points (- ) for multiple lines in the description
 9. For breaking changes, add BREAKING CHANGE: at the beginning of the footer or body section
-
-Format the message exactly like this:
-type(optional scope): short description
-
-- Detailed explanation of the changes
-- Reason for the changes
-- Any breaking changes (if applicable)
+10. Consider ALL changes in the diff when generating the commit message
 
 Respond ONLY with the commit message, no additional text or explanations."""
 
-        return f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        formatted_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 {system_message}<|eot_id|><|start_header_id|>user<|end_header_id|>
-{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+Generate a commit message for the following changes:
+
+{prompt}
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 """
+        return formatted_prompt
 
     def process_ollama_response(self, response: Mapping[str, Any]) -> str:
         generated_message = response.get("response", "").strip()
@@ -89,13 +90,19 @@ Respond ONLY with the commit message, no additional text or explanations."""
             logger.warning("Ollama returned an empty response")
             return "📝 Update files\n\nSummary of changes."
 
+        # Remove any special tokens that might have been generated
+        generated_message = generated_message.replace("<|eot_id|>", "").strip()
+
         lines = generated_message.split("\n")
         cleaned_lines = [
             line
             for line in lines
             if not line.startswith("Note:") and not line.startswith("IMPORTANT:")
         ]
-        return "\n".join(cleaned_lines).strip()
+
+        final_message = "\n".join(cleaned_lines).strip()
+        logger.info(f"Processed Ollama response: {final_message}")
+        return final_message
 
     @classmethod
     def check_ollama(cls) -> bool:
@@ -125,8 +132,12 @@ if __name__ == "__main__":
         lines = diff.split('\\n')
     """
     config = AIProviderConfig(
-        model=CONFIG.get_ai_model(), max_tokens=256, temperature=0.6
+        model=CONFIG.get_ai_model() or "llama3.1",
+        max_tokens=CONFIG.get_max_tokens() or 256,
+        temperature=CONFIG.get_temperature() or 0.6,
     )
     provider = OllamaProvider(config)
-    commit_message = provider.generate_commit_message(sample_diff)
-    logger.info(f"Generated commit message:\n{commit_message}")
+    commit_message = provider.generate_commit_message(
+        f"Updated diff analyzer with additional ignore patterns\n\nFull diff:\n{sample_diff}"
+    )
+    console.print(f"Generated commit message:\n{commit_message}")

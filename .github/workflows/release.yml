@@ -70,29 +70,20 @@ jobs:
         echo "Release version $VERSION"
     - name: Install dependencies for sigstore
       run: |
-        python -m pip install securesystemslib tuf sigstore
+        python -m pip install securesystemslib tuf sigstore==1.1.2
     - name: Sign the dists with Sigstore
-      uses: sigstore/gh-action-sigstore-python@v1.2.3
-      with:
-        inputs: >-
-          ./dist/*.tar.gz
-          ./dist/*.whl
+      run: |
+        python -m sigstore sign --oidc-client-id ${{ secrets.OIDC_CLIENT_ID }} --oidc-client-secret ${{ secrets.OIDC_CLIENT_SECRET }} --fulcio-url ${{ secrets.FULCIO_URL }} --rekor-url ${{ secrets.REKOR_URL }} ./dist/*.tar.gz ./dist/*.whl
     - name: Create GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: >-
-        gh release create
-        "${{ steps.get_version.outputs.version }}"
-        --repo '${{ github.repository }}'
-        --notes "Release ${{ steps.get_version.outputs.version }}"
-        dist/*
+      run: |
+        gh release create "${{ steps.get_version.outputs.version }}" --repo '${{ github.repository }}' --notes "Release ${{ steps.get_version.outputs.version }}" dist/*
     - name: Upload artifact signatures to GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: >-
-        gh release upload
-        "${{ steps.get_version.outputs.version }}" dist/**
-        --repo '${{ github.repository }}'
+      run: |
+        gh release upload "${{ steps.get_version.outputs.version }}" dist/** --repo '${{ github.repository }}'
 
   verify-installation:
     name: Verify Package Installation

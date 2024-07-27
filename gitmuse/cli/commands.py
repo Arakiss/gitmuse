@@ -17,7 +17,7 @@ from gitmuse.cli.ui import (
     edit_commit_message,
     perform_commit,
     display_ai_model_info,
-    IgnoredFile,  # Asegúrate de importar IgnoredFile desde gitmuse.cli.ui
+    IgnoredFile,
 )
 from gitmuse.utils.logging import get_logger
 from gitmuse.config.settings import CONFIG, ConfigError
@@ -49,7 +49,7 @@ def get_commit_files(
     return files_to_commit, ignored_files, diff_content
 
 
-def commit_command(provider: str) -> None:
+def commit_command(provider: str = "") -> None:
     try:
         if not check_staging_area():
             logger.warning("No changes in the staging area.")
@@ -77,7 +77,6 @@ def commit_command(provider: str) -> None:
             )
             return
 
-        # Convert StagedFile instances to tuples for display_changes
         files_to_commit_tuples: List[Tuple[str, str]] = [
             (file.status, file.file_path) for file in files_to_commit
         ]
@@ -85,6 +84,7 @@ def commit_command(provider: str) -> None:
         display_changes(files_to_commit_tuples, ignored_files)
         display_diff(diff_content)
 
+        provider = provider or CONFIG.get_ai_provider() or "ollama"
         display_ai_model_info(provider)
 
         try:
@@ -147,4 +147,4 @@ def commit_command(provider: str) -> None:
 
 
 if __name__ == "__main__":
-    commit_command("ollama")  # For testing purposes
+    commit_command()  # For testing purposes

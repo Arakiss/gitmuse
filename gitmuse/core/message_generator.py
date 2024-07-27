@@ -11,9 +11,11 @@ from gitmuse.providers.base import (
     OpenAIConfig,
     OllamaConfig,
 )
+from gitmuse.utils.logging import get_logger
 from rich.console import Console
 
 console = Console()
+logger = get_logger(__name__)
 
 
 class Changes(BaseModel):
@@ -27,34 +29,38 @@ def get_provider(provider: Optional[str] = None) -> AIProvider:
         "openai": OpenAIProvider,
         "ollama": OllamaProvider,
     }
-    provider_name = provider or CONFIG.get_ai_provider()
+    provider_name = provider or CONFIG.get_ai_provider() or "ollama"
     provider_class = providers.get(provider_name)
     if provider_class is None:
-        raise ValueError(f"Unsupported provider specified: {provider_name}")
+        logger.warning(
+            f"Unsupported provider specified: {provider_name}. Falling back to Ollama."
+        )
+        provider_name = "ollama"
+        provider_class = OllamaProvider
 
-    model = CONFIG.get_ai_model()
-    max_tokens = CONFIG.get_max_tokens()
-    temperature = CONFIG.get_temperature()
+    model = CONFIG.get_ai_model() or "llama3.1"
+    max_tokens = CONFIG.get_max_tokens() or 1000
+    temperature = CONFIG.get_temperature() or 0.7
 
     config: AIProviderConfig
     if provider_name == "openai":
         api_key = CONFIG.get_openai_api_key()
+        if not api_key:
+            raise ValueError("OpenAI API key is required but not provided.")
         config = OpenAIConfig(
             model=model, max_tokens=max_tokens, temperature=temperature, api_key=api_key
         )
         provider_instance = provider_class(config)
         if isinstance(provider_instance, OpenAIProvider):
             provider_instance.client = OpenAIProvider.configure(api_key)
-        return provider_instance
-    elif provider_name == "ollama":
-        url = CONFIG.get_ollama_url()
+    else:  # ollama
+        url = CONFIG.get_ollama_url() or "http://localhost:11434"
         config = OllamaConfig(
             model=model, max_tokens=max_tokens, temperature=temperature, url=url
         )
         provider_instance = provider_class(config)
-        return provider_instance
-    else:
-        raise ValueError(f"Unsupported provider: {provider_name}")
+
+    return provider_instance
 
 
 def load_template(provider: str) -> str:
@@ -66,13 +72,14 @@ def load_template(provider: str) -> str:
         if provider == "openai":
             return load_default_template()
         elif provider == "ollama":
-            return OllamaProvider.format_prompt_for_llama("")
+            return OllamaProvider.format_prompt_for_llama(load_default_template())
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            logger.warning(f"Unsupported provider: {provider}. Using default template.")
+            return load_default_template()
 
 
 def load_default_template() -> str:
-    default_template = """
+    return """
     Generate a semantic commit message for the following changes:
     Files changed: {files_summary}
     Summary: {changes_summary}
@@ -99,7 +106,6 @@ def load_default_template() -> str:
 
     IMPORTANT: Provide ONLY the commit message, no additional text or explanations.
     """
-    return default_template
 
 
 def create_prompt_content(
@@ -109,13 +115,15 @@ def create_prompt_content(
 ) -> str:
     commit_types = CONFIG.get_conventional_commit_types()
     keywords = ", ".join([f"{emoji} {verb}" for verb, emoji in commit_types.items()])
-    provider = CONFIG.get_ai_provider()
+    provider = CONFIG.get_ai_provider() or "ollama"
     template = custom_template if not use_default_template else load_template(provider)
+
+    detailed_changes = "\n".join(changes.detailed_changes)
 
     return template.format(
         files_summary=changes.files_summary,
         changes_summary=changes.changes_summary,
-        detailed_changes=" ".join(changes.detailed_changes),
+        detailed_changes=detailed_changes,
         keywords=keywords,
     )
 
@@ -128,14 +136,19 @@ def generate_commit_message(
 ) -> str:
     try:
         changes_dict = analyze_diff(diff)
+        logger.debug(f"Analyzed diff: {changes_dict}")
         changes = summarize_changes(changes_dict)
+        logger.debug(f"Summarized changes: {changes}")
         prompt_content = create_prompt_content(
             changes, use_default_template, custom_template
         )
+        logger.debug(f"Created prompt content: {prompt_content}")
         provider_instance = get_provider(provider)
-        return provider_instance.generate_commit_message(prompt_content)
+        message = provider_instance.generate_commit_message(prompt_content)
+        logger.info(f"Generated commit message: {message}")
+        return message
     except Exception as e:
-        console.print(f"[bold red]Error generating commit message: {str(e)}[/bold red]")
+        logger.exception(f"Error generating commit message: {str(e)}")
         return (
             "📝 Update files\n\nAn error occurred while generating the commit message."
         )

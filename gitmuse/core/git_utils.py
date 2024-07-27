@@ -1,6 +1,6 @@
 import os
 import subprocess
-from typing import List, Optional, Set, Sequence, Literal
+from typing import List, Optional, Set, Sequence, Literal, Tuple
 import fnmatch
 from rich.console import Console
 from functools import lru_cache
@@ -10,17 +10,12 @@ console = Console()
 
 
 class StagedFile(BaseModel):
-    status: Literal["A", "M", "D", "R100"]  # Add any additional status you need here
+    status: Literal["A", "M", "D", "R100"]
     file_path: str
 
     @validator("status")
     def validate_status(cls, v):
-        allowed_statuses = [
-            "A",
-            "M",
-            "D",
-            "R100",
-        ]  # Add any additional status you need here
+        allowed_statuses = ["A", "M", "D", "R100"]
         if v not in allowed_statuses:
             raise ValueError("Input should be 'A', 'M', 'D' or 'R100'")
         return v
@@ -142,12 +137,27 @@ def get_diff(file_path: str) -> str:
         return ""
 
 
+def get_full_diff() -> str:
+    result = run_command(["git", "diff", "--cached"])
+    if result.returncode == 0:
+        return result.stdout
+    else:
+        console.print("[bold yellow]Warning: Could not get full diff[/bold yellow]")
+        return ""
+
+
 def get_repo_root() -> str:
     result = run_command(["git", "rev-parse", "--show-toplevel"])
     if result.returncode == 0:
         return result.stdout.strip()
     else:
         raise RuntimeError("Not in a git repository")
+
+
+def get_commit_files() -> Tuple[List[StagedFile], str]:
+    staged_files = get_staged_files()
+    full_diff = get_full_diff()
+    return staged_files, full_diff
 
 
 if __name__ == "__main__":
@@ -164,6 +174,10 @@ if __name__ == "__main__":
     ignore_patterns = get_gitignore_patterns()
     print(f"Ignore patterns: {ignore_patterns}")
 
+    print("\nGetting full diff...")
+    full_diff = get_full_diff()
+    print(f"Full diff preview: {full_diff[:200]}...")
+
     if staged_files:
         test_file = staged_files[0].file_path
         print(f"\nGetting content for {test_file}...")
@@ -176,3 +190,8 @@ if __name__ == "__main__":
 
     print("\nGetting repository root...")
     print(f"Repo root: {get_repo_root()}")
+
+    print("\nGetting commit files...")
+    commit_files, commit_diff = get_commit_files()
+    print(f"Number of staged files: {len(commit_files)}")
+    print(f"Full diff length: {len(commit_diff)} characters")

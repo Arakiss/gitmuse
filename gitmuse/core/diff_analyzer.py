@@ -6,12 +6,13 @@ from gitmuse.core.git_utils import (
     run_command,
     should_ignore,
     StagedFile,
+    get_full_diff,
 )
+from gitmuse.utils.logging import get_logger
 from rich.console import Console
 from rich.progress import Progress
 from rich.table import Table
 from rich.panel import Panel
-import logging
 
 ADDITIONAL_IGNORE_PATTERNS = {
     "poetry.lock",
@@ -20,10 +21,10 @@ ADDITIONAL_IGNORE_PATTERNS = {
     "bun.lock",
 }
 
-FileStatus = Literal["A", "M", "D"]
+FileStatus = Literal["A", "M", "D", "R100"]
 
 console = Console()
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = get_logger(__name__)
 
 
 class GitDiffAnalyzer:
@@ -37,34 +38,27 @@ class GitDiffAnalyzer:
         self.ignore_patterns = ignore_patterns.union(ADDITIONAL_IGNORE_PATTERNS)
         self.staged_files = staged_files
 
-    def get_diff(self, staged_files: Sequence[StagedFile]) -> Tuple[str, List[str]]:
+    def get_diff(self) -> Tuple[str, List[str]]:
         """
         Gets the diff for the staged files.
 
-        :param staged_files: A list of StagedFile instances containing the status and path of staged files.
         :return: A tuple with the filtered diff and a list of ignored files.
         """
-        filtered_diff = ""
+        filtered_diff = get_full_diff()
         ignored_files = []
 
         with Progress() as progress:
             task = progress.add_task(
-                "[cyan]Processing staged files...", total=len(staged_files)
+                "[cyan]Processing staged files...", total=len(self.staged_files)
             )
 
-            for file in staged_files:
+            for file in self.staged_files:
                 progress.update(task, advance=1)
-                if should_ignore(file.file_path, self.ignore_patterns, staged_files):
+                if should_ignore(
+                    file.file_path, self.ignore_patterns, self.staged_files
+                ):
                     ignored_files.append(file.file_path)
-                    logging.info(f"Ignored file: {file.file_path}")
-                    continue
-
-                old_content, new_content = self._get_file_contents(
-                    file.status, file.file_path
-                )
-                diff = self._generate_diff(file.file_path, old_content, new_content)
-                emoji_status = self._get_status_emoji(file.status)
-                filtered_diff += f"{emoji_status} File: {file.file_path}\nStatus: {file.status}\n{''.join(diff)}\n"
+                    logger.info(f"Ignored file: {file.file_path}")
 
         return filtered_diff, ignored_files
 
@@ -72,7 +66,7 @@ class GitDiffAnalyzer:
         """
         Gets the file contents based on the status.
 
-        :param status: The status of the file (A, M, D).
+        :param status: The status of the file (A, M, D, R100).
         :param file_path: The path of the file.
         :return: A tuple with the old and new content of the file.
         """
@@ -86,9 +80,7 @@ class GitDiffAnalyzer:
                 new_content = self._run_git_command([":0", file_path])
                 return old_content, new_content
         except Exception as e:
-            console.print(
-                f"[bold red]Error retrieving file contents for {file_path}: {e}[/bold red]"
-            )
+            logger.error(f"Error retrieving file contents for {file_path}: {e}")
             return "", ""
 
     def _run_git_command(self, ref_file: List[str]) -> str:
@@ -131,27 +123,33 @@ class GitDiffAnalyzer:
             "added": [],
             "modified": [],
             "deleted": [],
+            "renamed": [],
         }
         current_file = ""
         current_status = ""
         current_content: List[str] = []
 
         for line in diff.split("\n"):
-            if line.startswith("File:"):
-                if current_file:  # Save the changes of the previous file
+            if line.startswith("diff --git"):
+                if current_file:
                     self._append_change(
                         changes, current_status, current_file, current_content
                     )
-                current_file = line.split(": ", 1)[1].strip()
+                current_file = line.split(" b/")[-1]
                 current_content = []
-            elif line.startswith("Status:"):
-                current_status = {"A": "added", "M": "modified", "D": "deleted"}[
-                    line.split(": ", 1)[1].strip()
-                ]
+            elif line.startswith("new file"):
+                current_status = "added"
+            elif line.startswith("deleted file"):
+                current_status = "deleted"
+            elif line.startswith("rename from"):
+                current_status = "renamed"
+            elif line.startswith("index"):
+                if not current_status:
+                    current_status = "modified"
             else:
-                current_content.append(line + "\n")
+                current_content.append(line)
 
-        if current_file:  # Save the changes of the last file
+        if current_file:
             self._append_change(changes, current_status, current_file, current_content)
 
         return changes
@@ -171,16 +169,19 @@ class GitDiffAnalyzer:
         :param file: The name of the file.
         :param content: The content of the change.
         """
-        changes[status].append({"file": file, "content": "".join(content).strip()})
+        changes[status].append({"file": file, "content": "\n".join(content).strip()})
 
-    def _get_status_emoji(self, status: str) -> str:
+    @staticmethod
+    def _get_status_emoji(status: str) -> str:
         """
         Gets the corresponding emoji for a file status.
 
         :param status: The status of the file.
         :return: A string containing the emoji.
         """
-        return {"A": "➕", "M": "✏️", "D": "🗑️"}.get(status, "")
+        return {"added": "✨", "modified": "🔨", "deleted": "🗑️", "renamed": "🚚"}.get(
+            status, ""
+        )
 
 
 def analyze_diff(diff: str) -> Dict[str, List[Dict[str, str]]]:
@@ -211,9 +212,7 @@ def display_analysis(
     for change_type, files in analysis.items():
         for file_info in files:
             content_preview = file_info["content"].split("\n")[0][:50]
-            emoji = {"added": "➕", "modified": "✏️", "deleted": "🗑️"}.get(
-                change_type, ""
-            )
+            emoji = GitDiffAnalyzer._get_status_emoji(change_type)
             table.add_row(
                 f"{emoji} {change_type.capitalize()}",
                 file_info["file"],
@@ -229,6 +228,21 @@ def display_analysis(
         console.print(ignored_panel)
 
 
+def get_diff_summary(diff: str) -> str:
+    """
+    Generates a summary of the diff.
+
+    :param diff: The diff as a string.
+    :return: A string summarizing the changes.
+    """
+    analysis = analyze_diff(diff)
+    summary = []
+    for change_type, files in analysis.items():
+        if files:
+            summary.append(f"{change_type.capitalize()}: {len(files)} file(s)")
+    return ", ".join(summary)
+
+
 def main() -> None:
     ignore_patterns = get_gitignore_patterns()
     staged_files: List[StagedFile] = get_staged_files()
@@ -237,9 +251,12 @@ def main() -> None:
         return
 
     analyzer = GitDiffAnalyzer(ignore_patterns, staged_files)
-    diff, ignored_files = analyzer.get_diff(staged_files)
+    diff, ignored_files = analyzer.get_diff()
     analysis = analyzer.analyze_diff(diff)
     display_analysis(analysis, ignored_files)
+
+    summary = get_diff_summary(diff)
+    console.print(f"\n[bold green]Summary:[/bold green] {summary}")
 
 
 if __name__ == "__main__":
