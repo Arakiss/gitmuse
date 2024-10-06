@@ -42,6 +42,7 @@ def run_commit() -> None:
     try:
         provider = os.getenv("PROVIDER", CONFIG.get_ai_provider())
 
+        # Validate the provider and configure it
         if provider == "openai":
             openai_api_key = os.getenv("OPENAI_API_KEY") or CONFIG.get_openai_api_key()
             if not openai_api_key:
@@ -57,6 +58,7 @@ def run_commit() -> None:
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
+        # Call the commit command with the provider
         commit_command(provider)
 
     except (RuntimeError, ValueError) as e:

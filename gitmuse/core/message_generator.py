@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel
 from gitmuse.core.diff_analyzer import analyze_diff
 from gitmuse.config.settings import CONFIG
@@ -7,12 +7,13 @@ from gitmuse.providers.openai import OpenAIProvider
 from gitmuse.providers.ollama import OllamaProvider
 from gitmuse.providers.base import (
     AIProvider,
-    AIProviderConfig,
     OpenAIConfig,
     OllamaConfig,
 )
 from gitmuse.utils.logging import get_logger
 from rich.console import Console
+import json
+import re
 
 console = Console()
 logger = get_logger(__name__)
@@ -29,7 +30,7 @@ def get_provider(provider: Optional[str] = None) -> AIProvider:
         "openai": OpenAIProvider,
         "ollama": OllamaProvider,
     }
-    provider_name = provider or CONFIG.get_ai_provider() or "ollama"
+    provider_name = provider or CONFIG.get_ai_provider()
     provider_class = providers.get(provider_name)
     if provider_class is None:
         logger.warning(
@@ -38,11 +39,10 @@ def get_provider(provider: Optional[str] = None) -> AIProvider:
         provider_name = "ollama"
         provider_class = OllamaProvider
 
-    model = CONFIG.get_ai_model() or "llama3.1"
-    max_tokens = CONFIG.get_max_tokens() or 1000
-    temperature = CONFIG.get_temperature() or 0.7
+    model = CONFIG.get_ai_model()
+    max_tokens = CONFIG.get_max_tokens()
+    temperature = CONFIG.get_temperature()
 
-    config: AIProviderConfig
     if provider_name == "openai":
         api_key = CONFIG.get_openai_api_key()
         if not api_key:
@@ -50,17 +50,13 @@ def get_provider(provider: Optional[str] = None) -> AIProvider:
         config = OpenAIConfig(
             model=model, max_tokens=max_tokens, temperature=temperature, api_key=api_key
         )
-        provider_instance = provider_class(config)
-        if isinstance(provider_instance, OpenAIProvider):
-            provider_instance.client = OpenAIProvider.configure(api_key)
     else:  # ollama
-        url = CONFIG.get_ollama_url() or "http://localhost:11434"
+        url = CONFIG.get_ollama_url()
         config = OllamaConfig(
             model=model, max_tokens=max_tokens, temperature=temperature, url=url
         )
-        provider_instance = provider_class(config)
 
-    return provider_instance
+    return provider_class(config)
 
 
 def load_template(provider: str) -> str:
@@ -80,31 +76,45 @@ def load_template(provider: str) -> str:
 
 def load_default_template() -> str:
     return """
-    Generate a semantic commit message for the following changes:
+    Generate a structured commit message for the following changes, following the semantic commit and gitemoji conventions:
+
     Files changed: {files_summary}
     Summary: {changes_summary}
 
     Detailed changes:
     {detailed_changes}
 
-    Follow these guidelines strictly:
-    1. Use one of the following commit types: {keywords}
-    2. Format: <type>[optional scope]: <description>
-    3. The description should be in lowercase and not end with a period
-    4. Keep the first line (header) under 50 characters
-    5. After the header, add a blank line followed by a more detailed description
-    6. In the description, explain the 'what' and 'why' of the changes, not the 'how'
-    7. Use bullet points (- ) for multiple lines in the description
-    8. Do not include file names or technical details unless absolutely necessary
+    Requirements:
+    1. Title: Maximum 50 characters, starting with an appropriate gitemoji, followed by the semantic commit type and a brief description.
+    2. Body: Organize changes into categories. Each category should have an appropriate emoji and 2-3 bullet points summarizing key changes.
+    3. Summary: A brief sentence summarizing the overall impact of the changes.
 
-    Format the message exactly like this:
-    type(optional scope): short description
+    Use one of the following commit types: {keywords}
 
-    - Detailed explanation of the changes
-    - Reason for the changes
-    - Any breaking changes (if applicable)
+    Respond in the following JSON format:
+    {{
+        "title": "Your commit message title here",
+        "body": {{
+            "Category1": {{
+                "emoji": "🔧",
+                "changes": [
+                    "First change in category 1",
+                    "Second change in category 1"
+                ]
+            }},
+            "Category2": {{
+                "emoji": "✨",
+                "changes": [
+                    "First change in category 2",
+                    "Second change in category 2"
+                ]
+            }}
+        }},
+        "summary": "A brief summary of the overall changes and their impact."
+    }}
 
-    IMPORTANT: Provide ONLY the commit message, no additional text or explanations.
+    Ensure that each category and change is relevant and specific to the changes provided. Use appropriate and varied emojis for different categories.
+    IMPORTANT: Provide ONLY the JSON response, no additional text or explanations.
     """
 
 
@@ -131,26 +141,51 @@ def create_prompt_content(
 def generate_commit_message(
     diff: str,
     provider: Optional[str] = None,
-    use_default_template: bool = True,
-    custom_template: str = "",
+    use_default_template: Optional[bool] = None,
+    custom_template: Optional[str] = None,
 ) -> str:
     try:
         changes_dict = analyze_diff(diff)
         logger.debug(f"Analyzed diff: {changes_dict}")
         changes = summarize_changes(changes_dict)
         logger.debug(f"Summarized changes: {changes}")
+        
+        if use_default_template is None or custom_template is None:
+            use_default_template, custom_template = CONFIG.get_commit_message_config()
+        
         prompt_content = create_prompt_content(
             changes, use_default_template, custom_template
         )
         logger.debug(f"Created prompt content: {prompt_content}")
         provider_instance = get_provider(provider)
-        message = provider_instance.generate_commit_message(prompt_content)
-        logger.info(f"Generated commit message: {message}")
-        return message
+        message_json = provider_instance.generate_commit_message(prompt_content)
+        logger.info(f"Generated commit message JSON: {message_json}")
+        
+        # Attempt to parse the JSON response
+        try:
+            commit_data = json.loads(message_json)
+        except json.JSONDecodeError as json_error:
+            logger.error(f"Failed to parse JSON: {json_error}")
+            logger.error(f"Raw response: {message_json}")
+            
+            # Attempt to extract a usable message from the raw response
+            extracted_message = extract_message_from_raw_response(message_json)
+            if extracted_message:
+                logger.info(f"Extracted message: {extracted_message}")
+                return extracted_message
+            else:
+                raise ValueError("Unable to extract a valid commit message from the AI response")
+        
+        # Format the commit message
+        formatted_message = format_commit_message(commit_data)
+        
+        logger.info(f"Formatted commit message: {formatted_message}")
+        return formatted_message
     except Exception as e:
         logger.exception(f"Error generating commit message: {str(e)}")
         return (
-            "📝 Update files\n\nAn error occurred while generating the commit message."
+            "📝 Update files\n\nAn error occurred while generating the commit message. "
+            f"Error details: {str(e)}"
         )
 
 
@@ -190,6 +225,58 @@ def generate_detailed_changes(changes: Dict[str, List[Dict[str, str]]]) -> List[
             else:
                 detailed_changes.append(f"{category.capitalize()} {item['file']}")
     return detailed_changes
+
+
+def format_commit_message(commit_data: Dict[str, Any]) -> str:
+    title = commit_data.get('title', 'Update files')[:50]
+    body = commit_data.get('body', {})
+    summary = commit_data.get('summary', 'Changes were made to the codebase.')
+
+    formatted_message = f"{title}\n\n"
+    if isinstance(body, dict):
+        for category, content in body.items():
+            emoji = content.get('emoji', '📝')
+            changes = content.get('changes', [])
+            formatted_message += f"{emoji} {category}:\n"
+            for change in changes:
+                formatted_message += f"{change}\n"
+            formatted_message += "\n"
+    elif isinstance(body, str):
+        formatted_message += f"{body}\n\n"
+    
+    formatted_message += f"{summary}\n"
+
+    return formatted_message
+
+
+def extract_message_from_raw_response(raw_response: str) -> Optional[str]:
+    """
+    Attempt to extract a usable commit message from a raw AI response.
+    """
+    # Look for content between triple backticks
+    match = re.search(r'```(?:json)?\s*(.*?)\s*```', raw_response, re.DOTALL)
+    if match:
+        try:
+            json_content = match.group(1)
+            commit_data = json.loads(json_content)
+            return format_commit_message(commit_data)
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse JSON within backticks: {json_content}")
+    
+    # If no JSON found, try to parse the entire response as JSON
+    try:
+        commit_data = json.loads(raw_response)
+        return format_commit_message(commit_data)
+    except json.JSONDecodeError:
+        logger.error(f"Failed to parse entire response as JSON: {raw_response}")
+    
+    # If no JSON found, look for a title-like line
+    lines = raw_response.split('\n')
+    for line in lines:
+        if re.match(r'^[📝✨🐛♻️🔧🚀]+\s*\w+(\(\w+\))?:\s*.{10,}$', line):
+            return line.strip()
+    
+    return None
 
 
 if __name__ == "__main__":

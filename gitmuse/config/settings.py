@@ -1,11 +1,11 @@
 import json
-from typing import Dict, Any, Optional, TypedDict, cast
 from pathlib import Path
-import jsonschema
-from jsonschema import validate
-from gitmuse.utils.logging import configure_logging, get_logger
-from pydantic import BaseModel, Field
+from typing import Any, Dict, Optional, TypedDict
 
+from jsonschema import validate
+import jsonschema
+from pydantic import BaseModel, Field
+from gitmuse.utils.logging import configure_logging, get_logger
 
 # Define typed dictionaries for our configuration structure
 class OpenAIConfig(TypedDict, total=False):
@@ -56,49 +56,66 @@ class ConfigDict(TypedDict):
     logging: LoggingConfigDict
 
 
+# Define default models
+DEFAULT_OPENAI_CONFIG: OpenAIConfig = {
+    "model": "gpt-4o",
+    "apiKey": "",
+    "organizationId": "",
+    "max_tokens": 1000,
+    "temperature": 0.7,
+}
+
+DEFAULT_OLLAMA_CONFIG: OllamaConfig = {
+    "model": "gemma2:27b",
+    "url": "http://localhost:11434",
+    "max_tokens": 1000,
+    "temperature": 0.7,
+}
+
+DEFAULT_COMMIT_CONFIG: CommitConfigDict = {
+    "style": "conventional",
+    "maxLength": 500,
+    "includeScope": True,
+    "includeBody": True,
+    "includeFooter": True,
+    "conventionalCommitTypes": {
+        "feat": "✨",
+        "fix": "🐛",
+        "docs": "📝",
+        "style": "💎",
+        "refactor": "♻️",
+        "perf": "⚡",
+        "test": "🧪",
+        "build": "🏗️",
+        "ci": "🚀",
+        "chore": "🧹",
+    },
+}
+
+DEFAULT_PROMPTS_CONFIG: PromptsConfigDict = {
+    "commitMessage": {"useDefault": True, "customTemplate": ""}
+}
+
+DEFAULT_LOGGING_CONFIG: LoggingConfigDict = {
+    "level": "INFO",
+    "format": "console",
+    "file": "",
+}
+
 # Default configuration
 DEFAULT_CONFIG: ConfigDict = {
     "version": 1,
     "ai": {
         "provider": "ollama",
-        "openai": {
-            "model": "gpt-4o",
-            "apiKey": "",
-            "organizationId": "",
-            "max_tokens": 1000,
-            "temperature": 0.7,
-        },
-        "ollama": {
-            "model": "llama3.1",
-            "url": "http://localhost:11434",
-            "max_tokens": 1000,
-            "temperature": 0.7,
-        },
+        "openai": DEFAULT_OPENAI_CONFIG,
+        "ollama": DEFAULT_OLLAMA_CONFIG,
     },
-    "commit": {
-        "style": "conventional",
-        "maxLength": 72,
-        "includeScope": True,
-        "includeBody": True,
-        "includeFooter": True,
-        "conventionalCommitTypes": {
-            "feat": "✨",
-            "fix": "🐛",
-            "docs": "📝",
-            "style": "💎",
-            "refactor": "♻️",
-            "perf": "⚡",
-            "test": "🧪",
-            "build": "🏗️",
-            "ci": "🚀",
-            "chore": "🧹",
-        },
-    },
-    "prompts": {"commitMessage": {"useDefault": True, "customTemplate": ""}},
-    "logging": {"level": "INFO", "format": "console", "file": ""},
+    "commit": DEFAULT_COMMIT_CONFIG,
+    "prompts": DEFAULT_PROMPTS_CONFIG,
+    "logging": DEFAULT_LOGGING_CONFIG,
 }
 
-SCHEMA_PATH = Path(__file__).parent.parent.parent / "gitmuse-schema.json"
+SCHEMA_PATH = Path(__file__).parent / "gitmuse-schema.json"
 
 
 class ConfigError(Exception):
@@ -141,16 +158,24 @@ class ConfigModel(BaseModel):
 
 
 class Config:
+    """
+    Configuration manager for GitMuse.
+    Loads and validates the configuration from a JSON file and provides access to the configuration values.
+    """
+
     def __init__(self):
         self.config = self.load_config()
         self.setup_logging()
         self.logger = get_logger(__name__)
 
     def setup_logging(self):
-        log_level = self.config.logging.level
-        log_format = self.config.logging.format
-        log_file = self.config.logging.file
-        configure_logging(log_level, log_format, log_file)
+        log_config = self.config.logging
+        configure_logging(
+            log_level=log_config.level,
+            log_format=log_config.format,
+            log_file=log_config.file,
+            use_rich=True  # Puedes ajustar esto según tus preferencias
+        )
 
     def load_schema(self) -> Optional[Dict[str, Any]]:
         if SCHEMA_PATH.exists():
@@ -170,16 +195,15 @@ class Config:
         return None
 
     def load_config(self) -> ConfigModel:
-        """Load configuration from gitmuse.json file or use default values."""
         config_dict: ConfigDict = DEFAULT_CONFIG.copy()
-        repo_root = self.find_repository_root()
         possible_paths = [
-            repo_root / "gitmuse.json" if repo_root else None,
-            Path.home() / "gitmuse.json",
+            Path.cwd() / "gitmuse.json",
+            Path.home() / ".config" / "gitmuse" / "gitmuse.json",
+            Path("/etc/gitmuse/gitmuse.json"),
         ]
 
         for config_path in possible_paths:
-            if config_path and config_path.exists():
+            if config_path.exists():
                 try:
                     user_config = json.loads(config_path.read_text())
                     schema = self.load_schema()
@@ -188,43 +212,20 @@ class Config:
                     config_dict.update(user_config)
                     print(f"Loaded configuration from {config_path}")
                     break
-                except (
-                    json.JSONDecodeError,
-                    jsonschema.exceptions.ValidationError,
-                ) as e:
-                    print(
-                        f"Warning: Invalid configuration in {config_path}. Using default configuration. Error: {e}"
-                    )
+                except (json.JSONDecodeError, jsonschema.exceptions.ValidationError) as e:
+                    print(f"Invalid configuration in {config_path}. Using default configuration. Error: {e}")
 
-        return ConfigModel(
-            version=config_dict["version"],
-            ai=AIConfig(
-                provider=config_dict["ai"]["provider"],
-                openai=cast(Optional[Dict[str, Any]], config_dict["ai"].get("openai")),
-                ollama=cast(Optional[Dict[str, Any]], config_dict["ai"].get("ollama")),
-            ),
-            commit=CommitConfig(**config_dict["commit"]),
-            prompts=PromptsConfig(**config_dict["prompts"]),
-            logging=LoggingConfig(**config_dict["logging"]),
-        )
+        return ConfigModel(**config_dict)
 
     def get_nested_config(self, *keys: str) -> Any:
         """Get a nested configuration value."""
-        value = self.config
+        value = self.config.model_dump() 
         for key in keys:
             try:
-                value = getattr(value, key)
-            except AttributeError:
-                try:
-                    value = value[key]
-                except (KeyError, TypeError):
-                    error_msg = f"Configuration key not found: {'.'.join(keys)}"
-                    self.logger.error(error_msg)
-                    raise ConfigError(error_msg)
-            if value is None:
-                error_msg = f"Configuration key not found: {'.'.join(keys)}"
-                self.logger.error(error_msg)
-                raise ConfigError(error_msg)
+                value = value[key]
+            except KeyError:
+                self.logger.error(f"Configuration key '{key}' not found.")
+                raise ConfigError(f"Configuration key '{key}' not found.")
         return value
 
     def get_ai_provider(self) -> str:

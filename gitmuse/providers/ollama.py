@@ -1,54 +1,74 @@
 from functools import lru_cache
-from typing import Optional, Dict, Any, Mapping, cast
-from gitmuse.providers.base import AIProvider, AIProviderConfig
+from typing import Optional, Dict, Any, Mapping
+from gitmuse.providers.base import AIProvider, OllamaConfig
 import ollama
 from gitmuse.utils.logging import get_logger
 from gitmuse.config.settings import CONFIG
 from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 logger = get_logger(__name__)
 console = Console()
 
-
 @lru_cache(maxsize=1)
 def get_ollama_status() -> Optional[Dict[str, Any]]:
+    """
+    Check the status of the Ollama service and cache the result.
+    """
     try:
-        return cast(Dict[str, Any], ollama.ps())
+        return ollama.ps()
     except Exception as e:
-        logger.error(f"Error checking Ollama status: {e}")
+        logger.error(f"Error checking Ollama status: {e}", exc_info=True)
+        console.print(f"[bold red]Error:[/bold red] Could not check Ollama status. Details: {e}")
         return None
 
-
 class OllamaProvider(AIProvider):
-    def __init__(self, config: AIProviderConfig):
-        super().__init__(config)
-        self.status = get_ollama_status()
-        self.url = CONFIG.get_ollama_url() or "http://localhost:11434"
-        logger.info(f"Initialized OllamaProvider with model {self.config.model}")
+    """
+    AI provider for generating commit messages using the Ollama service.
+    """
+    def __init__(self, config: OllamaConfig):
+        self.config = config
+        self.model = config.model
+        self.url = config.url or CONFIG.get_ollama_url() or "http://localhost:11434"
+        self.max_tokens = config.max_tokens
+        self.temperature = config.temperature
+        logger.info(f"Initialized OllamaProvider with model {self.model} at {self.url}")
+
+    @property
+    def status(self) -> bool:
+        return self.check_ollama()
 
     def generate_commit_message(self, prompt: str) -> str:
+        """
+        Generate a commit message using the Ollama service based on the given prompt.
+        """
         if not self.status:
             logger.warning("Ollama is not running or not accessible.")
             return "📝 Update files\n\nOllama is not running or not accessible."
 
         logger.info("Generating commit message with Ollama")
-        with self.display_progress("Generating commit message...") as progress:
+        progress = Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console)
+        with progress:
             task = progress.add_task("[cyan]Generating commit message...", total=None)
             try:
                 formatted_prompt = self.format_prompt_for_llama(prompt)
                 response = ollama.generate(
-                    model=self.config.model,
+                    model=self.model,
                     prompt=formatted_prompt,
-                    options=cast(ollama.Options, self.get_generation_options()),
+                    options=self.get_generation_options(),
                 )
                 progress.update(task, completed=True)
                 return self.process_ollama_response(response)
             except Exception as e:
                 progress.update(task, completed=True)
-                logger.error(f"Error generating commit message with Ollama: {e}")
-                return "📝 Update files\n\nSummary of changes."
+                logger.error(f"Error generating commit message with Ollama: {e}", exc_info=True)
+                console.print(f"[bold red]Error:[/bold red] Failed to generate commit message. Details: {e}")
+                return "📝 Update files\n\nFailed to generate commit message due to an error."
 
     def get_generation_options(self) -> Dict[str, Any]:
+        """
+        Get the generation options for the Ollama service.
+        """
         return {
             "temperature": self.config.temperature,
             "top_p": 0.9,
@@ -58,15 +78,21 @@ class OllamaProvider(AIProvider):
 
     @staticmethod
     def format_prompt_for_llama(prompt: str) -> str:
-        system_message = """You are an AI assistant specialized in generating semantic git commit messages. Your task is to create concise, informative, and well-structured commit messages based on the provided information.
+        """
+        Format the prompt to adhere to the guidelines for generating semantic commit messages.
+        """
+        commit_config = CONFIG.config.commit
+        commit_types = commit_config.conventionalCommitTypes
+        
+        system_message = f"""You are an AI assistant specialized in generating semantic git commit messages. Your task is to create concise, informative, and well-structured commit messages based on the provided information.
 
 Guidelines for generating semantic commit messages:
 1. Always start with the appropriate emoji followed by the commit type
 2. Use one of the following types with their corresponding emojis: 
-   ✨ feat, 🐛 fix, 📝 docs, 💎 style, ♻️ refactor, ⚡ perf, 🧪 test, 🏗️ build, 🚀 ci, 🧹 chore
+   {', '.join([f"{emoji} {verb}" for verb, emoji in commit_types.items()])}
 3. Format: <emoji> <type>[optional scope]: <description>
 4. The description should be in lowercase and not end with a period
-5. Keep the first line (header) under 50 characters
+5. Keep the first line (header) under {commit_config.maxLength} characters
 6. After the header, add a blank line followed by a more detailed description
 7. In the description, explain the 'what' and 'why' of the changes, not the 'how'
 8. Use bullet points (- ) for multiple lines in the description
@@ -131,10 +157,11 @@ if __name__ == "__main__":
     def analyze_diff(diff):
         lines = diff.split('\\n')
     """
-    config = AIProviderConfig(
-        model=CONFIG.get_ai_model() or "llama3.1",
-        max_tokens=CONFIG.get_max_tokens() or 256,
-        temperature=CONFIG.get_temperature() or 0.6,
+    config = OllamaConfig(
+        model=CONFIG.get_ai_model(),
+        max_tokens=CONFIG.get_max_tokens(),
+        temperature=CONFIG.get_temperature(),
+        url=CONFIG.get_ollama_url(),
     )
     provider = OllamaProvider(config)
     commit_message = provider.generate_commit_message(

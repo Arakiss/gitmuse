@@ -6,7 +6,7 @@ GitMuse is an AI-powered tool that helps developers craft meaningful and descrip
 
 ## Key Features
 
-- **No Configuration Needed**: Works out-of-the-box with Llama 3.1 and Ollama.
+- **No Configuration Needed**: Works out-of-the-box with Llama 3.2 and Ollama.
 - **AI-Powered Commit Messages**: Leverages OpenAI's GPT models, or Ollama for locally hosted models, to generate context-aware commit messages.
 - **Git Integration**: Seamlessly integrates with your existing Git workflow.
 - **Customizable**: Configure AI providers, commit message styles, and other preferences via a JSON configuration file.
@@ -49,7 +49,13 @@ GitMuse is currently in active development, but it is already fully functional w
 
 ## Configuration (Optional)
 
-GitMuse can be configured to match your preferences. Optionally, create a `gitmuse.json` file in your project root or home directory to customize the settings:
+GitMuse can be configured to match your preferences. You can create a `gitmuse.json` file in one of the following locations (in order of precedence):
+
+1. In your current project directory
+2. In your home directory: `~/.config/gitmuse/gitmuse.json`
+3. In the global configuration directory: `/etc/gitmuse/gitmuse.json`
+
+The configuration file should follow this structure:
 
 ```json
 {

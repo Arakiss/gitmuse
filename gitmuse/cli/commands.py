@@ -36,7 +36,7 @@ def get_commit_files(
     for file in staged_files:
         if should_ignore(file.file_path, ignore_patterns, staged_files):
             ignored_files.append(IgnoredFile(file_path=file.file_path))
-        elif file.status != "D":  # Skip deleted files
+        elif file.status[0] != "D":  # Skip deleted files, but handle renamed files
             file_diff = get_diff(file.file_path)
             if file_diff:
                 diff_content += (
@@ -49,8 +49,26 @@ def get_commit_files(
     return files_to_commit, ignored_files, diff_content
 
 
+def get_commit_message_config() -> Tuple[bool, str]:
+    try:
+        use_default_template = CONFIG.get_nested_config(
+            "prompts", "commitMessage", "useDefault"
+        )
+        custom_template = CONFIG.get_nested_config(
+            "prompts", "commitMessage", "customTemplate"
+        )
+        return use_default_template, custom_template
+    except ConfigError as e:
+        console.print(f":warning: [bold yellow]Warning:[/bold yellow] {str(e)}")
+        console.print(
+            "[bold yellow]Using default commit message template due to configuration error.[/bold yellow]"
+        )
+        return True, ""
+
+
 def commit_command(provider: str = "") -> None:
     try:
+        # Check for changes in the staging area
         if not check_staging_area():
             logger.warning("No changes in the staging area.")
             console.print(
@@ -58,6 +76,7 @@ def commit_command(provider: str = "") -> None:
             )
             return
 
+        # Get the staged files and ignore patterns
         ignore_patterns: Set[str] = get_gitignore_patterns()
         staged_files: List[StagedFile] = get_staged_files()
 
@@ -66,39 +85,24 @@ def commit_command(provider: str = "") -> None:
             console.print("[bold yellow]No changes to commit.[/bold yellow]")
             return
 
+        # Display changes and diff to the user
         files_to_commit, ignored_files, diff_content = get_commit_files(
             staged_files, ignore_patterns
         )
-
-        if not files_to_commit:
-            logger.warning("No changes to commit after applying ignore patterns.")
-            console.print(
-                "[bold yellow]No changes to commit after applying ignore patterns.[/bold yellow]"
-            )
-            return
-
-        files_to_commit_tuples: List[Tuple[str, str]] = [
-            (file.status, file.file_path) for file in files_to_commit
-        ]
-
-        display_changes(files_to_commit_tuples, ignored_files)
+        display_changes(files_to_commit, ignored_files)
         display_diff(diff_content)
 
+        # Validate the provider and display AI model info
         provider = provider or CONFIG.get_ai_provider() or "ollama"
+        if provider not in ["openai", "ollama"]:
+            console.print(f":x: [bold red]Error:[/bold red] Unsupported AI provider: {provider}")
+            return
         display_ai_model_info(provider)
 
-        try:
-            use_default_template = CONFIG.get_nested_config(
-                "prompts", "commitMessage", "useDefault"
-            )
-            custom_template = CONFIG.get_nested_config(
-                "prompts", "commitMessage", "customTemplate"
-            )
-        except ConfigError as e:
-            logger.error(f"Error accessing commit message configuration: {str(e)}")
-            use_default_template = True
-            custom_template = ""
+        # Get commit message configuration
+        use_default_template, custom_template = get_commit_message_config()
 
+        # Generate commit message
         commit_msg: str = generate_commit_message(
             diff_content,
             provider=provider,

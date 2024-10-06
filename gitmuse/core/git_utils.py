@@ -1,23 +1,23 @@
 import os
 import subprocess
-from typing import List, Optional, Set, Sequence, Literal, Tuple
+from typing import List, Optional, Set, Sequence, Tuple
 import fnmatch
 from rich.console import Console
 from functools import lru_cache
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 console = Console()
 
 
 class StagedFile(BaseModel):
-    status: Literal["A", "M", "D", "R100"]
+    status: str
     file_path: str
 
-    @validator("status")
-    def validate_status(cls, v):
-        allowed_statuses = ["A", "M", "D", "R100"]
-        if v not in allowed_statuses:
-            raise ValueError("Input should be 'A', 'M', 'D' or 'R100'")
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if not v or v[0] not in ["A", "M", "D", "R"]:
+            raise ValueError("Invalid status. Must start with A, M, D, or R")
         return v
 
 
@@ -52,8 +52,8 @@ def get_staged_files() -> List[StagedFile]:
     result = run_command(["git", "diff", "--cached", "--name-status"])
     staged_files: List[StagedFile] = []
     for line in result.stdout.splitlines():
-        parts = line.split("\t")
-        if len(parts) >= 2:
+        parts = line.split(maxsplit=1)
+        if len(parts) == 2:
             staged_files.append(StagedFile(status=parts[0], file_path=parts[1]))
         else:
             console.print(

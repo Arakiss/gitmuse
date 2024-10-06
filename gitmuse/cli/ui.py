@@ -10,6 +10,7 @@ import subprocess
 import os
 from pydantic import BaseModel
 from gitmuse.utils.logging import get_logger
+from gitmuse.config.settings import CONFIG, ConfigError
 
 logger = get_logger(__name__)
 console = Console()
@@ -25,11 +26,12 @@ class IgnoredFile(BaseModel):
 
 
 def display_table(
-    title: str, columns: List[Tuple[str, str]], rows: List[Tuple[str, str]]
+    title: str, columns: List[Tuple[str, str]], rows: List[List[str]]
 ) -> None:
-    table = Table(
-        title=title, title_justify="left", style="bold magenta"
-    )  # Cambiado a "bold magenta"
+    """
+    Display a table with a given title, columns, and rows.
+    """
+    table = Table(title=title, title_justify="left", style="bold magenta")
     for col_name, col_style in columns:
         table.add_column(col_name, style=col_style)
 
@@ -41,35 +43,42 @@ def display_table(
 
 
 def display_changes(
-    staged_files: List[Tuple[str, str]], ignored_files: List[IgnoredFile]
+    files_to_commit: List[StagedFile], ignored_files: List[IgnoredFile]
 ) -> None:
-    changes: Dict[str, List[str]] = {"A": [], "M": [], "D": []}
-    for status, file_path in staged_files:
-        changes[status].append(file_path)
+    changes: Dict[str, List[str]] = {
+        "Added": [],
+        "Modified": [],
+        "Deleted": [],
+        "Renamed": [],
+        "Ignored": [file.file_path for file in ignored_files],
+    }
 
-    rows: List[Tuple[str, str]] = []
+    for file in files_to_commit:
+        if file.status.startswith('A'):
+            changes["Added"].append(file.file_path)
+        elif file.status.startswith('M'):
+            changes["Modified"].append(file.file_path)
+        elif file.status.startswith('D'):
+            changes["Deleted"].append(file.file_path)
+        elif file.status.startswith('R'):
+            changes["Renamed"].append(file.file_path)
+
+    table = Table(title="Changes to be committed")
+    table.add_column("Status", style="cyan")
+    table.add_column("File", style="green")
+
     for status, files in changes.items():
-        status_word = {"A": "New file", "M": "Modified", "D": "Deleted"}[status]
-        for file_path in files:
-            rows.append((status_word, file_path))
+        for file in files:
+            table.add_row(status, file)
 
-    display_table(
-        "Changes to be committed", [("Status", "cyan"), ("File", "green")], rows
-    )
-
-    if ignored_files:
-        ignored_count = len(ignored_files)
-        console.print(
-            f"\n[bold yellow]Ignored {ignored_count} file(s) based on .gitignore rules:[/bold yellow]"
-        )
-        for ignored_file in ignored_files[:5]:
-            console.print(f"  - {ignored_file.file_path}")
-        if ignored_count > 5:
-            console.print(f"  ... and {ignored_count - 5} more")
-        logger.info(f"Ignored {ignored_count} files based on .gitignore rules")
+    console.print(table)
 
 
 def display_diff(diff: str) -> None:
+    """
+    Ask the user how they would like to view the diff and display it accordingly.
+    """
+
     view_option = Prompt.ask(
         "How would you like to view the diff?",
         choices=["full", "summary", "none"],
@@ -105,30 +114,35 @@ def display_diff(diff: str) -> None:
 
 
 def edit_commit_message(initial_message: str) -> str:
+    """
+    Open the default editor to allow the user to edit the commit message.
+    The editor to use can be set via the EDITOR environment variable.
+    """
     try:
         with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_file:
             temp_file.write(initial_message)
             temp_file.flush()
-            editor = os.getenv("EDITOR", "nano")
+            editor = os.getenv("EDITOR", "nano")  
             subprocess.run([editor, temp_file.name], check=True)
             temp_file.seek(0)
             edited_message = temp_file.read()
         logger.info("Commit message edited by user")
         return edited_message.strip()
-    except subprocess.CalledProcessError:
-        logger.error("Failed to open editor for commit message editing")
-        console.print(
-            "[bold red]Error: Failed to open editor. Using original message.[/bold red]"
-        )
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to open editor: {e}")
+        console.print("[bold red]Error: Failed to open editor. Using original message.[/bold red]")
         return initial_message
     finally:
         os.remove(temp_file.name)
 
 
 def perform_commit(message: str) -> None:
+    """
+    Ask the user to confirm the commit message and perform the commit if confirmed.
+    """
     if not Confirm.ask(
         "[bold yellow]Are you sure you want to commit with this message?[/bold yellow]",
-        default=True,  # Cambiado a True para que 'y' sea el valor por defecto
+        default=True,
     ):
         console.print("[bold blue]Commit cancelled.[/bold blue]")
         logger.info("Commit cancelled by user")
@@ -161,15 +175,41 @@ def perform_commit(message: str) -> None:
 
 
 def display_ai_model_info(provider: str) -> None:
+    """
+    Display information about the AI model based on the provider.
+    """
+    try:
+        model = CONFIG.get_ai_model()
+    except ConfigError:
+        logger.warning("Failed to get AI model from config. Using default.")
+        model = "default model"
+
     model_info = {
-        "ollama": "Using Llama 3.1 model via Ollama for commit message generation.",
-        "openai": "Using OpenAI's GPT model for commit message generation.",
+        "ollama": f"Using {model} model via Ollama for commit message generation.",
+        "openai": f"Using OpenAI's {model} model for commit message generation.",
     }
     info_message = model_info.get(
-        provider, f"Using {provider} for commit message generation."
+        provider, f"Using {provider} ({model}) for commit message generation."
     )
     console.print(f"[bold green]{info_message}[/bold green]")
     logger.info(f"AI model info: {info_message}")
+
+
+def display_commit_message(message: str, title: str) -> None:
+    """
+    Display the commit message in a panel that wraps text properly.
+    """
+    wrapped_message = "\n".join(
+        line.strip() for line in message.split("\n") if line.strip()
+    )
+    panel = Panel(
+        wrapped_message,
+        title=title,
+        expand=False,
+        border_style="green",
+        padding=(1, 1),
+    )
+    console.print(panel)
 
 
 if __name__ == "__main__":
