@@ -108,10 +108,10 @@ def get_file_content(file_path: str, revision: str = "HEAD") -> str:
 def get_diff(file_path: str) -> str:
     try:
         if os.path.exists(file_path):
-            result = run_command(["git", "diff", "--cached", file_path])
+            result = run_command(["git", "diff", "--cached", "--unified=5", file_path])
         else:
             result = run_command(
-                ["git", "diff", "--cached", "--", "/dev/null", file_path]
+                ["git", "diff", "--cached", "--unified=5", "--", "/dev/null", file_path]
             )
 
         if result.returncode == 0:

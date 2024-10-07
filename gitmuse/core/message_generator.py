@@ -87,6 +87,7 @@ def load_default_template() -> str:
     1. Title: Maximum 50 characters, starting with an appropriate gitemoji, followed by the semantic commit type and a brief description.
     2. Body: Organize changes into categories. Each category should have an appropriate emoji and 2-3 bullet points summarizing key changes.
     3. Summary: A brief sentence summarizing the overall impact of the changes.
+    4. For small changes (e.g., adding or removing a single line), focus on the purpose of the change rather than just describing the modification.
 
     Use one of the following commit types: {keywords}
 
@@ -113,6 +114,7 @@ def load_default_template() -> str:
     }}
 
     Ensure that each category and change is relevant and specific to the changes provided. Use appropriate and varied emojis for different categories.
+    For very small changes, focus on the intent or purpose of the change, not just the literal modification.
     IMPORTANT: Provide ONLY the JSON response, no additional text or explanations.
     """
 
@@ -209,16 +211,17 @@ def generate_detailed_changes(changes: Dict[str, List[Dict[str, str]]]) -> List[
     for category, items in changes.items():
         for item in items:
             file_ext = os.path.splitext(item["file"])[1]
-            if file_ext == ".md":
-                detailed_changes.append(
-                    f"{category.capitalize()} documentation: {item['file']}"
-                )
-            elif file_ext in [".py", ".js", ".ts"]:
-                detailed_changes.append(
-                    f"{category.capitalize()} code in {item['file']}"
-                )
+            file_type = "code" if file_ext in ['.py', '.js', '.ts', '.cpp', '.java'] else \
+                        "documentation" if file_ext in ['.md', '.txt', '.rst'] else \
+                        "configuration" if file_ext in ['.json', '.yaml', '.yml', '.toml'] else \
+                        "unknown"
+            
+            change_description = f"{category.capitalize()} in {file_type} file {item['file']}: "
+            if "content" in item:
+                change_description += f"{item['content'][:50]}..."
             else:
-                detailed_changes.append(f"{category.capitalize()} {item['file']}")
+                change_description += "File modified"
+            detailed_changes.append(change_description)
     return detailed_changes
 
 
@@ -261,6 +264,8 @@ def extract_message_from_raw_response(raw_response: str) -> Optional[str]:
     # If no JSON found, try to parse the entire response as JSON
     try:
         commit_data = json.loads(raw_response)
+        if isinstance(commit_data, list):
+            return format_commit_message({"body": commit_data})
         return format_commit_message(commit_data)
     except json.JSONDecodeError:
         logger.error(f"Failed to parse entire response as JSON: {raw_response}")
@@ -271,7 +276,8 @@ def extract_message_from_raw_response(raw_response: str) -> Optional[str]:
         if re.match(r'^[✨🐛♻️🔧🚀]+\s*\w+(\(\w+\))?:\s*.{10,}$', line):
             return line.strip()
     
-    return None
+    # If all else fails, return the raw response
+    return raw_response.strip()
 
 
 if __name__ == "__main__":
