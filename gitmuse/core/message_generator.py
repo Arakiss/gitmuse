@@ -91,7 +91,7 @@ def load_default_template() -> str:
 
     Use one of the following commit types: {keywords}
 
-    Respond in the following JSON format:
+    IMPORTANT: Respond ONLY with a JSON object in the following format. Do not include any other text or explanations:
     {{
         "title": "Your commit message title here",
         "body": {{
@@ -157,7 +157,6 @@ def generate_commit_message(
             use_default = use_default_template if use_default_template is not None else template_config[0]
             template = custom_template or template_config[1]
         else:
-            # Si template_config es un str, ajustamos las variables en consecuencia
             use_default = use_default_template if use_default_template is not None else True
             template = custom_template or template_config
         
@@ -167,17 +166,18 @@ def generate_commit_message(
             template
         )
         logger.debug(f"Created prompt content: {prompt_content}")
+        
         provider_instance = get_provider(provider)
         message_json = provider_instance.generate_commit_message(prompt_content)
-        logger.info(f"Generated commit message JSON: {message_json}")
+        logger.info(f"Raw AI response: {message_json}")
         
-        # Attempt to extract a usable message from the raw response
         extracted_message = extract_message_from_raw_response(message_json)
-        if extracted_message:
-            logger.info(f"Extracted message: {extracted_message}")
-            return extracted_message
-        else:
-            raise ValueError("Unable to extract a valid commit message from the AI response")
+        logger.info(f"Extracted message: {extracted_message}")
+        
+        if not extracted_message.strip():
+            raise ValueError("Generated commit message is empty")
+        
+        return extracted_message
     except Exception as e:
         logger.exception(f"Error generating commit message: {str(e)}")
         return (
@@ -190,8 +190,8 @@ def summarize_changes(changes: Dict[str, List[Dict[str, str]]]) -> Changes:
     files_changed = list(
         set(change["file"] for category in changes.values() for change in category)
     )
-    files_summary = ", ".join(files_changed[:3]) + (
-        "..." if len(files_changed) > 3 else ""
+    files_summary = ", ".join(files_changed[:5]) + (
+        f" and {len(files_changed) - 5} more files" if len(files_changed) > 5 else ""
     )
     changes_summary = ", ".join(
         f"{category.capitalize()}: {len(items)} file(s)"
@@ -218,14 +218,17 @@ def generate_detailed_changes(changes: Dict[str, List[Dict[str, str]]]) -> List[
             
             change_description = f"{category.capitalize()} in {file_type} file {item['file']}: "
             if "content" in item:
-                change_description += f"{item['content'][:50]}..."
+                change_description += f"{item['content'][:100]}..."
             else:
                 change_description += "File modified"
             detailed_changes.append(change_description)
     return detailed_changes
 
 
-def format_commit_message(commit_data: Dict[str, Any]) -> str:
+def format_commit_message(commit_data: Union[Dict[str, Any], str]) -> str:
+    if isinstance(commit_data, str):
+        return commit_data
+
     title = commit_data.get('title', 'Update files')[:50]
     body = commit_data.get('body', {})
     summary = commit_data.get('summary', 'Changes were made to the codebase.')
@@ -233,51 +236,86 @@ def format_commit_message(commit_data: Dict[str, Any]) -> str:
     formatted_message = f"{title}\n\n"
     if isinstance(body, dict):
         for category, content in body.items():
-            emoji = content.get('emoji', '📝')
-            changes = content.get('changes', [])
-            formatted_message += f"{emoji} {category}:\n"
-            for change in changes:
-                formatted_message += f"{change}\n"
+            if isinstance(content, dict):
+                emoji = content.get('emoji', '📝')
+                changes = content.get('changes', [])
+                formatted_message += f"{emoji} {category}:\n"
+                for change in changes:
+                    formatted_message += f"- {change}\n"
+            elif isinstance(content, list):
+                formatted_message += f"📝 {category}:\n"
+                for change in content:
+                    formatted_message += f"- {change}\n"
+            else:
+                formatted_message += f"📝 {category}: {content}\n"
             formatted_message += "\n"
+    elif isinstance(body, list):
+        for item in body:
+            formatted_message += f"{item}\n"
+        formatted_message += "\n"
     elif isinstance(body, str):
         formatted_message += f"{body}\n\n"
     
     formatted_message += f"{summary}\n"
 
-    return formatted_message
+    return formatted_message.strip()
 
 
-def extract_message_from_raw_response(raw_response: str) -> Optional[str]:
+def extract_message_from_raw_response(raw_response: str) -> str:
     """
     Attempt to extract a usable commit message from a raw AI response.
     """
-    # Look for content between triple backticks
-    match = re.search(r'```(?:json)?\s*(.*?)\s*```', raw_response, re.DOTALL)
-    if match:
-        try:
-            json_content = match.group(1)
-            commit_data = json.loads(json_content)
-            return format_commit_message(commit_data)
-        except json.JSONDecodeError:
-            logger.error(f"Failed to parse JSON within backticks: {json_content}")
-    
-    # If no JSON found, try to parse the entire response as JSON
+    # Remove any markdown code block indicators
+    raw_response = re.sub(r'```(?:json)?\s*', '', raw_response)
+    raw_response = raw_response.strip('`')
+
+    # First, try to parse as JSON
     try:
         commit_data = json.loads(raw_response)
-        if isinstance(commit_data, list):
-            return format_commit_message({"body": commit_data})
         return format_commit_message(commit_data)
     except json.JSONDecodeError:
-        logger.error(f"Failed to parse entire response as JSON: {raw_response}")
-    
-    # If no JSON found, look for a title-like line
+        pass
+
+    # If not JSON, try to extract structured information
     lines = raw_response.split('\n')
+    title = ""
+    body = []
+    summary = ""
+    current_section = ""
+
     for line in lines:
-        if re.match(r'^[✨🐛♻️🔧🚀]+\s*\w+(\(\w+\))?:\s*.{10,}$', line):
-            return line.strip()
-    
-    # If all else fails, return the raw response
-    return raw_response.strip()
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith(('💎', '✨', '⬆️', '🐛', '♻️', '📝', '🔧', '🚀')):
+            if title:
+                current_section = line
+            else:
+                title = line
+        elif line.startswith('-'):
+            body.append(f"{current_section}\n{line}")
+        elif not summary and not line.startswith('-'):
+            summary = line
+
+    formatted_message = f"{title}\n\n" if title else ""
+    formatted_message += "\n".join(body)
+    formatted_message += f"\n\n{summary}" if summary else ""
+
+    if not formatted_message.strip():
+        # If we couldn't extract structured information, use the raw response as is
+        formatted_message = raw_response
+
+    return formatted_message.strip()
+
+
+def format_non_json_response(raw_response: str) -> str:
+    """
+    Format a non-JSON response into a commit message.
+    """
+    lines = raw_response.split('\n')
+    title = lines[0][:50] if lines else "Update files"
+    body = "\n".join(lines[1:])
+    return f"{title}\n\n{body}"
 
 
 if __name__ == "__main__":
