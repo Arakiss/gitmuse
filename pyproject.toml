@@ -7,7 +7,7 @@ name = "gitmuse"
 description = "GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<4.0"
 authors = [{ name = "Petru Arakiss", email = "petruarakiss@gmail.com" }]
 dynamic = ["version"]
 keywords = ["git", "gpt", "openai", "cli", "productivity", "commit-messages"]
@@ -23,22 +23,22 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
-    "rich >= 13.1.0, < 14.0.0",
-    "ruff >= 0.5.4, < 0.6.0",
-    "ollama >= 0.3.0, < 0.4.0",
-    "openai >= 1.37.0, < 2.0.0",
-    "toml >= 0.10.2, < 0.11.0",
-    "jsonschema >= 4.23.0, < 5.0.0",
-    "click >= 8.1.7, < 9.0.0",
-    "structlog >= 24.4.0, < 25.0.0",
-    "pydantic >= 2.8.2, < 3.0.0",
+    "rich>=13.1.0,<14.0.0",
+    "ruff>=0.5.4,<0.6.0",
+    "ollama>=0.3.0,<0.4.0",
+    "openai>=1.37.0,<2.0.0",
+    "toml>=0.10.2,<0.11.0",
+    "jsonschema>=4.23.0,<5.0.0",
+    "click>=8.1.7,<9.0.0",
+    "structlog>=24.4.0,<25.0.0",
+    "pydantic>=2.8.2,<3.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "mypy >= 1.11.0, < 2.0.0",
-    "pytest >= 8.3.1, < 9.0.0",
-    "types-jsonschema >= 4.23.0, < 5.0.0",
+    "mypy>=1.11.0,<2.0.0",
+    "pytest>=8.3.1,<9.0.0",
+    "types-jsonschema>=4.23.0,<5.0.0",
 ]
 
 [project.scripts]
@@ -74,20 +74,6 @@ packages = [{ include = "gitmuse" }]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
-rich = "^13.1.0"
-ruff = "^0.5.4"
-ollama = "^0.3.0"
-openai = "^1.37.0"
-toml = "^0.10.2"
-jsonschema = "^4.23.0"
-click = "^8.1.7"
-structlog = "^24.4.0"
-pydantic = "^2.8.2"
-
-[tool.poetry.group.dev.dependencies]
-mypy = "^1.11.0"
-pytest = "^8.3.1"
-types-jsonschema = "^4.23.0.20240712"
 
 [tool.poetry.scripts]
 gitmuse = "gitmuse.__main__:main"
