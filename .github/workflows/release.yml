@@ -3,81 +3,51 @@ name: Release
 on:
   push:
     tags:
-      - '*.*.*'
+      - 'v*.*.*'
 
 jobs:
-  build:
-    name: Build distribution
+  build-and-publish:
+    name: Build and publish
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install hatchling
-    - name: Build a binary wheel and a source tarball
-      run: python -m hatchling build
+    - name: Install Hatch
+      run: pip install hatch
+    - name: Build project
+      run: hatch build
+    - name: Publish to PyPI
+      env:
+        HATCH_INDEX_USER: __token__
+        HATCH_INDEX_AUTH: ${{ secrets.PYPI_TOKEN }}
+      run: hatch publish
     - name: Get version
       id: get_version
-      run: |
-        VERSION=$(find dist -type f -name '*.tar.gz' | grep -oP '\d+.\d+.\d+')
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-    - name: Store the distribution packages
-      uses: actions/upload-artifact@v3
-      with:
-        name: python-package-distributions
-        path: dist/
-
-  publish-to-pypi:
-    name: Publish to PyPI
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    steps:
-    - name: Download all the dists
-      uses: actions/download-artifact@v3
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Publish distribution to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_TOKEN }}
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
   github-release:
     name: Create GitHub Release
-    needs: [build, publish-to-pypi]
+    needs: build-and-publish
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
     - uses: actions/checkout@v4
-    - name: Download all the dists
-      uses: actions/download-artifact@v3
-      with:
-        name: python-package-distributions
-        path: dist/
     - name: Create GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create "v${{ needs.build.outputs.version }}" \
+        gh release create "${GITHUB_REF#refs/tags/}" \
           --repo '${{ github.repository }}' \
-          --title "Release v${{ needs.build.outputs.version }}" \
-          --notes "Release ${{ needs.build.outputs.version }}" \
-          dist/*
+          --title "${GITHUB_REF#refs/tags/}" \
+          --generate-notes
 
   verify-installation:
     name: Verify Package Installation
-    needs: [build, publish-to-pypi]
+    needs: build-and-publish
     runs-on: ubuntu-latest
     steps:
     - name: Set up Python
@@ -88,12 +58,14 @@ jobs:
       run: |
         echo "Waiting for PyPI to process the upload..."
         sleep 300
+    - name: Get version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
     - name: Install and verify package
       run: |
         python -m venv test_env
         source test_env/bin/activate
         pip install --upgrade pip
-        pip install gitmuse==${{ needs.build.outputs.version }} --no-cache-dir --verbose
+        pip install gitmuse==$VERSION --no-cache-dir --verbose
         gitmuse --version
     - name: Debug PyPI package info
       if: failure()
@@ -101,4 +73,4 @@ jobs:
         pip install yolk3k
         yolk -V gitmuse
         yolk -F gitmuse
-        pip install gitmuse==${{ needs.build.outputs.version }} --no-cache-dir --verbose
+        pip install gitmuse==$VERSION --no-cache-dir --verbose

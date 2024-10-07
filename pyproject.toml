@@ -53,17 +53,15 @@ documentation = "https://github.com/Arakiss/gitmuse/wiki"
 path = "gitmuse/__version__.py"
 
 [tool.hatch.build.targets.wheel]
-only-include = ["gitmuse"]
+packages = ["gitmuse"]
 
 [tool.hatch.build.targets.sdist]
-only-include = [
+include = [
     "gitmuse",
-    "tests",
     "README.md",
     "LICENSE",
     "pyproject.toml",
 ]
-
 [tool.poetry]
 name = "gitmuse"
 version = "0.2.0"
