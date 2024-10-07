@@ -8,19 +8,19 @@ from gitmuse.core.git_utils import (
     get_staged_files,
     get_diff,
     should_ignore,
-    StagedFile,
+
 )
-from gitmuse.core.message_generator import generate_commit_message
 from gitmuse.cli.ui import (
     display_changes,
     display_diff,
     edit_commit_message,
     perform_commit,
     display_ai_model_info,
-    IgnoredFile,
 )
+from gitmuse.models import StagedFile, IgnoredFile
 from gitmuse.utils.logging import get_logger
 from gitmuse.config.settings import CONFIG, ConfigError
+from gitmuse.core.message_generator import generate_commit_message
 
 logger = get_logger(__name__)
 console = Console()
@@ -36,7 +36,7 @@ def get_commit_files(
     for file in staged_files:
         if should_ignore(file.file_path, ignore_patterns, staged_files):
             ignored_files.append(IgnoredFile(file_path=file.file_path))
-        elif file.status[0] != "D":  # Skip deleted files, but handle renamed files
+        elif file.status[0] != "D":
             file_diff = get_diff(file.file_path)
             if file_diff:
                 diff_content += (

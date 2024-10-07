@@ -5,7 +5,7 @@ from gitmuse.utils.logging import get_logger
 from gitmuse.config.settings import CONFIG
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
-import requests
+import requests  # type: ignore
 import json
 import re
 
@@ -16,7 +16,7 @@ console = Console()
 class OpenAIProvider(AIProvider):
     def __init__(self, config: AIProviderConfig):
         super().__init__(config)
-        self.api_key = config.api_key or CONFIG.get_openai_api_key()
+        self.api_key = config.api_key or CONFIG.get_openai_api_key()  # type: ignore
         self.model = config.model or CONFIG.get_ai_model() or "gpt-4o"
         self.url = "https://api.openai.com/v1/chat/completions"
         logger.info(f"Initialized OpenAIProvider with model {self.model}")
@@ -66,7 +66,11 @@ class OpenAIProvider(AIProvider):
         Process the response from the OpenAI API.
         """
         content = response['choices'][0]['message']['content']
-        content = re.search(r'\{.*\}', content, re.DOTALL).group()
+        match = re.search(r'\{.*\}', content, re.DOTALL)
+        if match:
+            content = match.group()
+        else:
+            raise ValueError("Unable to extract JSON content from the response")
         commit_data = json.loads(content)
         return self.format_commit_message(commit_data)
 
@@ -155,7 +159,7 @@ if __name__ == "__main__":
         model=CONFIG.get_ai_model() or "gpt-4o",
         max_tokens=CONFIG.get_max_tokens() or 300,
         temperature=CONFIG.get_temperature() or 0.7,
-        api_key=CONFIG.get_openai_api_key(),
+        api_key=CONFIG.get_openai_api_key(),  # type: ignore
     )
     provider = OpenAIProvider(config)
 

@@ -1,17 +1,18 @@
 from functools import lru_cache
-from typing import Optional, Dict, Any, Mapping
+from typing import Optional, Any, Mapping
 from gitmuse.providers.base import AIProvider, OllamaConfig
 import ollama
 from gitmuse.utils.logging import get_logger
 from gitmuse.config.settings import CONFIG
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from ollama import Options
 
 logger = get_logger(__name__)
 console = Console()
 
 @lru_cache(maxsize=1)
-def get_ollama_status() -> Optional[Dict[str, Any]]:
+def get_ollama_status() -> Optional[Mapping[str, Any]]:
     """
     Check the status of the Ollama service and cache the result.
     """
@@ -52,10 +53,13 @@ class OllamaProvider(AIProvider):
             task = progress.add_task("[cyan]Generating commit message...", total=None)
             try:
                 formatted_prompt = self.format_prompt_for_llama(prompt)
+                
+                # Asegúrate de pasar correctamente los parámetros como espera la sobrecarga.
                 response = ollama.generate(
                     model=self.model,
                     prompt=formatted_prompt,
-                    options=self.get_generation_options(),
+                    options=self.get_generation_options(),  # Aquí usamos un dict válido con los parámetros correctos.
+                    stream=False
                 )
                 progress.update(task, completed=True)
                 return self.process_ollama_response(response)
@@ -65,16 +69,17 @@ class OllamaProvider(AIProvider):
                 console.print(f"[bold red]Error:[/bold red] Failed to generate commit message. Details: {e}")
                 return "📝 Update files\n\nFailed to generate commit message due to an error."
 
-    def get_generation_options(self) -> Dict[str, Any]:
+    def get_generation_options(self) -> Options:
         """
-        Get the generation options for the Ollama service.
+        Get the generation options for the Ollama service and return them as an `Options` object.
         """
-        return {
-            "temperature": self.config.temperature,
-            "top_p": 0.9,
-            "top_k": 40,
-            "num_predict": self.config.max_tokens,
-        }
+        # Devolvemos un objeto de tipo Options, lo cual es compatible con la sobrecarga que espera ollama.generate
+        return Options(
+            temperature=self.config.temperature,
+            top_p=0.9,
+            top_k=40,
+            num_predict=self.config.max_tokens,
+        )
 
     @staticmethod
     def format_prompt_for_llama(prompt: str) -> str:

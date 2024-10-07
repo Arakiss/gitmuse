@@ -4,21 +4,9 @@ from typing import List, Optional, Set, Sequence, Tuple
 import fnmatch
 from rich.console import Console
 from functools import lru_cache
-from pydantic import BaseModel, field_validator
+from gitmuse.models import StagedFile
 
 console = Console()
-
-
-class StagedFile(BaseModel):
-    status: str
-    file_path: str
-
-    @field_validator("status")
-    @classmethod
-    def validate_status(cls, v: str) -> str:
-        if not v or v[0] not in ["A", "M", "D", "R"]:
-            raise ValueError("Invalid status. Must start with A, M, D, or R")
-        return v
 
 
 def run_command(
@@ -54,7 +42,8 @@ def get_staged_files() -> List[StagedFile]:
     for line in result.stdout.splitlines():
         parts = line.split(maxsplit=1)
         if len(parts) == 2:
-            staged_files.append(StagedFile(status=parts[0], file_path=parts[1]))
+            status, file_path = parts
+            staged_files.append(StagedFile(status=status, file_path=file_path))
         else:
             console.print(
                 f"[bold yellow]Warning: Unexpected git diff output: {line}[/bold yellow]"

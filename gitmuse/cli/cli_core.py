@@ -3,7 +3,6 @@ import click
 from rich.console import Console
 from gitmuse.config.settings import CONFIG
 from gitmuse.cli.commands import commit_command
-from gitmuse.providers.openai import OpenAIProvider
 from gitmuse.providers.ollama import OllamaProvider
 
 console = Console()
@@ -36,20 +35,20 @@ def init(is_global):
 def run_commit() -> None:
     """
     Run the commit command based on the specified provider.
-    Checks the provider environment variable and configures the corresponding provider (OpenAI or Ollama).
-    Raises errors if the provider is unsupported, API key is missing for OpenAI, or Ollama is not accessible.
+    Checks the provider environment variable and raises errors if the provider is unsupported,
+    API key is missing for OpenAI, or Ollama is not accessible.
     """
     try:
         provider = os.getenv("PROVIDER", CONFIG.get_ai_provider())
 
-        # Validate the provider and configure it
+        # Validate the provider and check required configurations
         if provider == "openai":
             openai_api_key = os.getenv("OPENAI_API_KEY") or CONFIG.get_openai_api_key()
             if not openai_api_key:
                 raise RuntimeError(
                     "OpenAI API key not found. Please set the OPENAI_API_KEY environment variable or in the configuration file."
                 )
-            OpenAIProvider.configure(openai_api_key)
+            # No es necesario configurar OpenAIProvider aquí
         elif provider == "ollama":
             if not OllamaProvider.check_ollama():
                 raise RuntimeError(

@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 from pydantic import BaseModel
 from gitmuse.core.diff_analyzer import analyze_diff
 from gitmuse.config.settings import CONFIG
@@ -38,7 +38,7 @@ def get_provider(provider: Optional[str] = None) -> AIProvider:
         raise ValueError(f"Unsupported AI provider: {provider}")
 
     if provider == "openai":
-        config = OpenAIConfig(
+        config: Union[OpenAIConfig, OllamaConfig] = OpenAIConfig(
             model=CONFIG.get_ai_model(),
             max_tokens=CONFIG.get_max_tokens(),
             temperature=CONFIG.get_temperature(),
@@ -55,6 +55,7 @@ def get_provider(provider: Optional[str] = None) -> AIProvider:
         raise ValueError(f"Unsupported AI provider: {provider}")
 
     return provider_class(config)
+
 
 
 def load_template(provider: str) -> str:
@@ -148,11 +149,20 @@ def generate_commit_message(
         changes = summarize_changes(changes_dict)
         logger.debug(f"Summarized changes: {changes}")
         
-        if use_default_template is None or custom_template is None:
-            use_default_template, custom_template = CONFIG.get_commit_message_config()
+        template_config = CONFIG.get_commit_message_template()
+        
+        if isinstance(template_config, tuple):
+            use_default = use_default_template if use_default_template is not None else template_config[0]
+            template = custom_template or template_config[1]
+        else:
+            # Si template_config es un str, ajustamos las variables en consecuencia
+            use_default = use_default_template if use_default_template is not None else True
+            template = custom_template or template_config
         
         prompt_content = create_prompt_content(
-            changes, use_default_template, custom_template
+            changes, 
+            use_default,
+            template
         )
         logger.debug(f"Created prompt content: {prompt_content}")
         provider_instance = get_provider(provider)
@@ -258,7 +268,7 @@ def extract_message_from_raw_response(raw_response: str) -> Optional[str]:
     # If no JSON found, look for a title-like line
     lines = raw_response.split('\n')
     for line in lines:
-        if re.match(r'^[📝✨🐛♻️🔧🚀]+\s*\w+(\(\w+\))?:\s*.{10,}$', line):
+        if re.match(r'^[✨🐛♻️🔧🚀]+\s*\w+(\(\w+\))?:\s*.{10,}$', line):
             return line.strip()
     
     return None

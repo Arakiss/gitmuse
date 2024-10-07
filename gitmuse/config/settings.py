@@ -3,8 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from typing_extensions import TypedDict
 
-from jsonschema import validate
-import jsonschema
+import jsonschema  # type: ignore
 from pydantic import BaseModel
 from gitmuse.utils.logging import configure_logging, get_logger
 
@@ -205,7 +204,7 @@ class Config:
                     user_config = json.loads(config_path.read_text())
                     schema = self.load_schema()
                     if schema:
-                        validate(instance=user_config, schema=schema)
+                        jsonschema.validate(instance=config_dict, schema=schema)
                     config_dict.update(user_config)
                     print(f"Loaded configuration from {config_path}")
                     break

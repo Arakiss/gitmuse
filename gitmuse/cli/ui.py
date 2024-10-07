@@ -8,21 +8,12 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 import tempfile
 import subprocess
 import os
-from pydantic import BaseModel
 from gitmuse.utils.logging import get_logger
 from gitmuse.config.settings import CONFIG, ConfigError
+from gitmuse.models import StagedFile, IgnoredFile
 
 logger = get_logger(__name__)
 console = Console()
-
-
-class StagedFile(BaseModel):
-    status: str
-    file_path: str
-
-
-class IgnoredFile(BaseModel):
-    file_path: str
 
 
 def display_table(
@@ -42,7 +33,9 @@ def display_table(
     logger.debug(f"Displayed table: {title}")
 
 
-def display_changes(changes: List[StagedFile], ignored_files: List[IgnoredFile]) -> None:
+def display_changes(
+    changes: List[StagedFile], ignored_files: List[IgnoredFile]
+) -> None:
     changes_dict: Dict[str, List[str]] = {
         "Added": [],
         "Modified": [],

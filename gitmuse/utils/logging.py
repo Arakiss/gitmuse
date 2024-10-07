@@ -1,8 +1,8 @@
 import structlog
 from structlog.stdlib import LoggerFactory
 from structlog.processors import TimeStamper, StackInfoRenderer, format_exc_info
-from structlog.typing import Processor
-from typing import List, Optional, Dict, Any
+from structlog.typing import Processor, EventDict
+from typing import List, Optional
 from rich.console import Console
 
 console = Console()
@@ -20,7 +20,7 @@ def get_file_output(log_file: str) -> Processor:
     return structlog.processors.JSONRenderer(file=open(log_file, "a"))
 
 def get_rich_console_output() -> Processor:
-    def rich_renderer(_, __, event_dict: Dict[str, Any]) -> str:
+    def rich_renderer(_, __, event_dict: EventDict) -> str:
         level = event_dict.get("level", "info").upper()
         message = event_dict.get("event", "")
         extra = {k: v for k, v in event_dict.items() if k not in {"level", "event", "timestamp"}}

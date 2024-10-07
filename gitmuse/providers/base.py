@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, Generator
 from pydantic import BaseModel, Field
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.console import Console
@@ -36,7 +36,7 @@ class AIProvider(BaseProvider):
         self.config = config
         self.extra_config: Dict[str, Any] = kwargs
 
-    def display_progress(self, task_description: str) -> Progress:
+    def display_progress(self, task_description: str) -> Generator[Progress, None, None]:
         """
         Display a progress spinner for long-running tasks.
         """
@@ -45,7 +45,7 @@ class AIProvider(BaseProvider):
             TextColumn(f"[progress.description]{task_description}"),
             console=console,
         ) as progress:
-            yield progress  # This should be used as a context manager
+            yield progress
 
     @abstractmethod
     def generate_commit_message(self, prompt: str) -> str:
