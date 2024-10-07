@@ -30,31 +30,29 @@ def get_provider(provider: Optional[str] = None) -> AIProvider:
         "openai": OpenAIProvider,
         "ollama": OllamaProvider,
     }
-    provider_name = provider or CONFIG.get_ai_provider()
-    provider_class = providers.get(provider_name)
-    if provider_class is None:
-        logger.warning(
-            f"Unsupported provider specified: {provider_name}. Falling back to Ollama."
-        )
-        provider_name = "ollama"
-        provider_class = OllamaProvider
 
-    model = CONFIG.get_ai_model()
-    max_tokens = CONFIG.get_max_tokens()
-    temperature = CONFIG.get_temperature()
+    provider = provider or CONFIG.get_ai_provider()
+    provider_class = providers.get(provider)
 
-    if provider_name == "openai":
-        api_key = CONFIG.get_openai_api_key()
-        if not api_key:
-            raise ValueError("OpenAI API key is required but not provided.")
+    if not provider_class:
+        raise ValueError(f"Unsupported AI provider: {provider}")
+
+    if provider == "openai":
         config = OpenAIConfig(
-            model=model, max_tokens=max_tokens, temperature=temperature, api_key=api_key
+            model=CONFIG.get_ai_model(),
+            max_tokens=CONFIG.get_max_tokens(),
+            temperature=CONFIG.get_temperature(),
+            api_key=CONFIG.get_openai_api_key(),
         )
-    else:  # ollama
-        url = CONFIG.get_ollama_url()
+    elif provider == "ollama":
         config = OllamaConfig(
-            model=model, max_tokens=max_tokens, temperature=temperature, url=url
+            model=CONFIG.get_ai_model(),
+            max_tokens=CONFIG.get_max_tokens(),
+            temperature=CONFIG.get_temperature(),
+            url=CONFIG.get_ollama_url(),
         )
+    else:
+        raise ValueError(f"Unsupported AI provider: {provider}")
 
     return provider_class(config)
 

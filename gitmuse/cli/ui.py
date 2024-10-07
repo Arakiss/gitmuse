@@ -42,10 +42,8 @@ def display_table(
     logger.debug(f"Displayed table: {title}")
 
 
-def display_changes(
-    files_to_commit: List[StagedFile], ignored_files: List[IgnoredFile]
-) -> None:
-    changes: Dict[str, List[str]] = {
+def display_changes(changes: List[StagedFile], ignored_files: List[IgnoredFile]) -> None:
+    changes_dict: Dict[str, List[str]] = {
         "Added": [],
         "Modified": [],
         "Deleted": [],
@@ -53,25 +51,26 @@ def display_changes(
         "Ignored": [file.file_path for file in ignored_files],
     }
 
-    for file in files_to_commit:
+    for file in changes:
         if file.status.startswith('A'):
-            changes["Added"].append(file.file_path)
+            changes_dict["Added"].append(file.file_path)
         elif file.status.startswith('M'):
-            changes["Modified"].append(file.file_path)
+            changes_dict["Modified"].append(file.file_path)
         elif file.status.startswith('D'):
-            changes["Deleted"].append(file.file_path)
+            changes_dict["Deleted"].append(file.file_path)
         elif file.status.startswith('R'):
-            changes["Renamed"].append(file.file_path)
+            changes_dict["Renamed"].append(file.file_path)
 
-    table = Table(title="Changes to be committed")
+    table = Table(title="Changes", title_justify="left", style="bold magenta")
     table.add_column("Status", style="cyan")
-    table.add_column("File", style="green")
+    table.add_column("Files", style="green")
 
-    for status, files in changes.items():
-        for file in files:
-            table.add_row(status, file)
+    for status, files in changes_dict.items():
+        if files:
+            table.add_row(status, "\n".join(files))
 
     console.print(table)
+    logger.debug("Displayed changes table")
 
 
 def display_diff(diff: str) -> None:
@@ -223,9 +222,7 @@ if __name__ == "__main__":
         IgnoredFile(file_path="ignored1.txt"),
         IgnoredFile(file_path="ignored2.log"),
     ]
-    display_changes(
-        [(file.status, file.file_path) for file in staged_files], ignored_files
-    )
+    display_changes(staged_files, ignored_files)
 
     sample_diff = "diff --git a/file1.py b/file1.py\n--- a/file1.py\n+++ b/file1.py\n@@ -1,3 +1,4 @@\n print('hello')\n+print('world')\n"
     display_diff(sample_diff)

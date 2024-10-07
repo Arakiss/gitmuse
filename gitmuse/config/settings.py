@@ -1,10 +1,11 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional, TypedDict
+from typing import Any, Dict, Optional
+from typing_extensions import TypedDict
 
 from jsonschema import validate
 import jsonschema
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from gitmuse.utils.logging import configure_logging, get_logger
 
 # Define typed dictionaries for our configuration structure
@@ -126,9 +127,8 @@ class ConfigError(Exception):
 
 class AIConfig(BaseModel):
     provider: str
-    openai: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    ollama: Optional[Dict[str, Any]] = Field(default_factory=dict)
-
+    openai: Optional[OpenAIConfig] = None
+    ollama: Optional[OllamaConfig] = None
 
 class CommitConfig(BaseModel):
     style: str
@@ -138,16 +138,13 @@ class CommitConfig(BaseModel):
     includeFooter: bool
     conventionalCommitTypes: Dict[str, str]
 
-
 class PromptsConfig(BaseModel):
     commitMessage: Dict[str, Any]
-
 
 class LoggingConfig(BaseModel):
     level: str
     format: str
-    file: Optional[str] = ""
-
+    file: Optional[str] = None
 
 class ConfigModel(BaseModel):
     version: int
@@ -213,9 +210,15 @@ class Config:
                     print(f"Loaded configuration from {config_path}")
                     break
                 except (json.JSONDecodeError, jsonschema.exceptions.ValidationError) as e:
-                    print(f"Invalid configuration in {config_path}. Using default configuration. Error: {e}")
+                    raise ConfigError(f"Invalid configuration: {str(e)}")
 
-        return ConfigModel(**config_dict)
+        return ConfigModel(
+            version=config_dict["version"],
+            ai=AIConfig(**config_dict["ai"]),
+            commit=CommitConfig(**config_dict["commit"]),
+            prompts=PromptsConfig(**config_dict["prompts"]),
+            logging=LoggingConfig(**config_dict["logging"])
+        )
 
     def get_nested_config(self, *keys: str) -> Any:
         """Get a nested configuration value."""

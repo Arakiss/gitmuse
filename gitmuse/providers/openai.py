@@ -16,8 +16,8 @@ console = Console()
 class OpenAIProvider(AIProvider):
     def __init__(self, config: AIProviderConfig):
         super().__init__(config)
-        self.api_key = config.openai.get("apiKey") or CONFIG.get_openai_api_key()
-        self.model = config.openai.get("model") or CONFIG.get_ai_model() or "gpt-4"
+        self.api_key = config.api_key or CONFIG.get_openai_api_key()
+        self.model = config.model or CONFIG.get_ai_model() or "gpt-4o"
         self.url = "https://api.openai.com/v1/chat/completions"
         logger.info(f"Initialized OpenAIProvider with model {self.model}")
 
@@ -155,10 +155,7 @@ if __name__ == "__main__":
         model=CONFIG.get_ai_model() or "gpt-4o",
         max_tokens=CONFIG.get_max_tokens() or 300,
         temperature=CONFIG.get_temperature() or 0.7,
-        openai={
-            "apiKey": CONFIG.get_openai_api_key(),  # Ensure this is set in your environment
-            "model": CONFIG.get_ai_model() or "gpt-4o",
-        }
+        api_key=CONFIG.get_openai_api_key(),
     )
     provider = OpenAIProvider(config)
 
