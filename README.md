@@ -2,7 +2,7 @@
 
 GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages. By analyzing your staged changes, GitMuse provides intelligent suggestions for your commit messages, making your Git history more informative and easier to navigate.
 
-[![Release](https://github.com/Arakiss/gitmuse/actions/workflows/release.yml/badge.svg)](https://github.com/Arakiss/gitmuse/actions/workflows/release.yml)
+[![Release](https://github.com/Arakiss/gitmuse/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/Arakiss/gitmuse/actions/workflows/release.yml)
 
 ## Key Features
 
