@@ -54,6 +54,8 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
+    - name: Install requests
+      run: pip install requests
     - name: Wait and verify package installation
       run: |
         echo "Waiting for PyPI to process the upload..."
@@ -68,10 +70,8 @@ jobs:
         done
         echo "Error: Could not install package after 10 attempts"
         exit 1
-    - name: Debug PyPI package info
+    - name: Debug package info
       if: failure()
       run: |
-        pip install yolk3k
-        yolk -V gitmuse
-        yolk -F gitmuse
-        pip install gitmuse=${GITHUB_REF#refs/tags/v} --no-cache-dir --verbose
+        pip show gitmuse
+        pip install gitmuse==${GITHUB_REF#refs/tags/v} --no-cache-dir --verbose

@@ -64,7 +64,7 @@ include = [
 ]
 [tool.poetry]
 name = "gitmuse"
-version = "0.3.1"
+version = "0.3.2"
 description = "GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages."
 authors = ["Petru Arakiss <petruarakiss@gmail.com>"]
 readme = "README.md"
