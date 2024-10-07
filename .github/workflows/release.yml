@@ -54,23 +54,24 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    - name: Wait for PyPI to process the upload
+    - name: Wait and verify package installation
       run: |
         echo "Waiting for PyPI to process the upload..."
-        sleep 300
-    - name: Get version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-    - name: Install and verify package
-      run: |
-        python -m venv test_env
-        source test_env/bin/activate
-        pip install --upgrade pip
-        pip install gitmuse==$VERSION --no-cache-dir --verbose
-        gitmuse --version
+        for i in {1..10}; do
+          if pip install gitmuse==${GITHUB_REF#refs/tags/v} --no-cache-dir; then
+            echo "Package installed successfully"
+            gitmuse --version
+            exit 0
+          fi
+          echo "Attempt $i failed, waiting 30 seconds..."
+          sleep 30
+        done
+        echo "Error: Could not install package after 10 attempts"
+        exit 1
     - name: Debug PyPI package info
       if: failure()
       run: |
         pip install yolk3k
         yolk -V gitmuse
         yolk -F gitmuse
-        pip install gitmuse==$VERSION --no-cache-dir --verbose
+        pip install gitmuse=${GITHUB_REF#refs/tags/v} --no-cache-dir --verbose
