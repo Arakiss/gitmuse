@@ -161,26 +161,13 @@ def generate_commit_message(
         message_json = provider_instance.generate_commit_message(prompt_content)
         logger.info(f"Generated commit message JSON: {message_json}")
         
-        # Attempt to parse the JSON response
-        try:
-            commit_data = json.loads(message_json)
-        except json.JSONDecodeError as json_error:
-            logger.error(f"Failed to parse JSON: {json_error}")
-            logger.error(f"Raw response: {message_json}")
-            
-            # Attempt to extract a usable message from the raw response
-            extracted_message = extract_message_from_raw_response(message_json)
-            if extracted_message:
-                logger.info(f"Extracted message: {extracted_message}")
-                return extracted_message
-            else:
-                raise ValueError("Unable to extract a valid commit message from the AI response")
-        
-        # Format the commit message
-        formatted_message = format_commit_message(commit_data)
-        
-        logger.info(f"Formatted commit message: {formatted_message}")
-        return formatted_message
+        # Attempt to extract a usable message from the raw response
+        extracted_message = extract_message_from_raw_response(message_json)
+        if extracted_message:
+            logger.info(f"Extracted message: {extracted_message}")
+            return extracted_message
+        else:
+            raise ValueError("Unable to extract a valid commit message from the AI response")
     except Exception as e:
         logger.exception(f"Error generating commit message: {str(e)}")
         return (
