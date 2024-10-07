@@ -2,22 +2,34 @@ import os
 import click
 from rich.console import Console
 from gitmuse.config.settings import CONFIG
-from gitmuse.cli.commands import commit_command
 from gitmuse.providers.ollama import OllamaProvider
+from gitmuse.__version__ import __version__
+from gitmuse.cli.banner import GITMUSE_BANNER
+from gitmuse.cli.commands import commit_command
 
 console = Console()
 
-
-@click.group()
-def cli():
+@click.group(invoke_without_command=True)
+@click.pass_context
+@click.option('--version', is_flag=True, help="Show the version and exit.")
+def cli(ctx, version):
     """GitMuse CLI"""
-    pass
-
+    if version:
+        console.print(GITMUSE_BANNER, style="bold cyan")
+        console.print(f"GitMuse v{__version__}", style="italic green")
+        console.print("AI-powered Git commit message generator", style="italic")
+        ctx.exit()
+    elif ctx.invoked_subcommand is None:
+        console.print(GITMUSE_BANNER, style="bold cyan")
+        console.print(f"GitMuse v{__version__}", style="italic green")
+        console.print("AI-powered Git commit message generator", style="italic")
 
 @cli.command()
 def commit():
     """Generate and apply a commit message"""
     run_commit()
+
+cli.add_command(commit)
 
 
 @cli.command()
@@ -30,7 +42,6 @@ def init(is_global):
         CONFIG.init_config(os.path.expanduser("~/gitmuse.json"))
     else:
         CONFIG.init_config()
-
 
 def run_commit() -> None:
     """
@@ -48,7 +59,7 @@ def run_commit() -> None:
                 raise RuntimeError(
                     "OpenAI API key not found. Please set the OPENAI_API_KEY environment variable or in the configuration file."
                 )
-            # No es necesario configurar OpenAIProvider aquí
+            # No need to configure OpenAIProvider here
         elif provider == "ollama":
             if not OllamaProvider.check_ollama():
                 raise RuntimeError(
@@ -63,10 +74,8 @@ def run_commit() -> None:
     except (RuntimeError, ValueError) as e:
         console.print(f":x: [bold red]Error:[/bold red] {e}")
 
-
 def run_cli():
     cli()
-
 
 if __name__ == "__main__":
     run_cli()

@@ -54,15 +54,13 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    - name: Install requests
-      run: pip install requests
     - name: Wait and verify package installation
       run: |
         echo "Waiting for PyPI to process the upload..."
         for i in {1..10}; do
           if pip install gitmuse==${GITHUB_REF#refs/tags/v} --no-cache-dir; then
             echo "Package installed successfully"
-            gitmuse --version
+            gitmuse version
             exit 0
           fi
           echo "Attempt $i failed, waiting 30 seconds..."
