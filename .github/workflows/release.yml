@@ -60,7 +60,7 @@ jobs:
         for i in {1..10}; do
           if pip install gitmuse==${GITHUB_REF#refs/tags/v} --no-cache-dir; then
             echo "Package installed successfully"
-            gitmuse version
+            gitmuse --version
             exit 0
           fi
           echo "Attempt $i failed, waiting 30 seconds..."
