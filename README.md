@@ -1,3 +1,5 @@
+> ⚠️ **Archived** — AI commit messages are now a native part of Claude Code (and GitHub Copilot CLI), generated from your CLAUDE.md voice rules. This tool no longer adds value beyond what's in the modern AI-assisted terminal. Kept for history; use `claude` instead.
+
 # GitMuse
 
 GitMuse is an AI-powered tool that helps developers craft meaningful and descriptive Git commit messages. By analyzing your staged changes, GitMuse provides intelligent suggestions for your commit messages, making your Git history more informative and easier to navigate.
